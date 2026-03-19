@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Building #1 · Machining Production Planning</title>
+    <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+        href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@300;400;500&display=swap"
+        rel="stylesheet" />
+    <link rel="stylesheet" href="styles.css" />
+</head>
+
+<body>
+
+    <!-- LOADING OVERLAY -->
+    <div id="loading-overlay" class="loading-overlay hidden">
+        <div class="lo-inner">
+            <svg class="lo-gear" viewBox="0 0 50 50" fill="none">
+                <path
+                    d="M25 6v5M25 39v5M6 25h5M39 25h5M11.1 11.1l3.5 3.5M35.4 35.4l3.5 3.5M38.9 11.1l-3.5 3.5M14.6 35.4l-3.5 3.5"
+                    stroke="currentColor" stroke-width="3" stroke-linecap="round" />
+                <circle cx="25" cy="25" r="8" stroke="currentColor" stroke-width="3" />
+                <circle cx="25" cy="25" r="3" fill="currentColor" />
+            </svg>
+            <p id="loading-message">Initializing…</p>
+        </div>
+    </div>
+
+    <!-- TOAST -->
+    <div id="toast" class="toast hidden" role="alert"></div>
+
+    <!-- REPORTS MODAL -->
+    <div id="reports-modal" class="modal-backdrop hidden">
+        <div class="modal">
+            <div class="modal-hdr">
+                <span class="modal-tag">REPORTS</span>
+                <h3>Export &amp; Reports</h3>
+                <button class="modal-x" id="reports-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p style="font-size:.8rem;color:var(--tx2);margin-bottom:16px">Export production data to Excel for
+                    offline review or reporting.</p>
+                <div style="display:flex;flex-direction:column;gap:10px">
+                    <button class="btn btn-outline btn-block" id="rpt-parts-btn">
+                        📋 Export Parts List (.xlsx)<br>
+                        <span style="font-size:.66rem;color:var(--tx3);font-family:var(--ff-m)">All parts with vehicle
+                            flags, op hours, status</span>
+                    </button>
+                    <button class="btn btn-outline btn-block" id="rpt-sched-btn">
+                        📅 Export Production Schedule (.xlsx)<br>
+                        <span style="font-size:.66rem;color:var(--tx3);font-family:var(--ff-m)">Full task list with
+                            machine assignments and estimated dates</span>
+                    </button>
+                    <button class="btn btn-outline btn-block" id="rpt-print-btn">
+                        🖨 Print Schedule<br>
+                        <span style="font-size:.66rem;color:var(--tx3);font-family:var(--ff-m)">Opens the browser print
+                            dialog</span>
+                    </button>
+                </div>
+            </div>
+            <div class="modal-ftr">
+                <button class="btn btn-ghost" id="reports-cancel">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MACHINE MODAL -->
+    <div id="machine-modal" class="modal-backdrop hidden">
+        <div class="modal">
+            <div class="modal-hdr">
+                <span class="modal-tag">MACHINE CONFIG</span>
+                <h3 id="modal-title">Add Machine</h3>
+                <button id="modal-close" class="modal-x">&times;</button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="machine-id" />
+                <div class="mform mform-2">
+                    <div class="mf-field">
+                        <label>Machine Name</label>
+                        <input type="text" id="m-name" placeholder="Noble 1, PM 2…" />
+                        <span class="mf-hint">Must be unique</span>
+                    </div>
+                    <div class="mf-field">
+                        <label>Machine Type</label>
+                        <input type="text" id="m-type" placeholder="Noble, PM, Skoda…" />
+                        <span class="mf-hint">Matches Location in parts data</span>
+                    </div>
+                    <div class="mf-field">
+                        <label>Capacity %</label>
+                        <input type="number" id="m-capacity" min="1" max="100" value="100" />
+                    </div>
+                    <div class="mf-field">
+                        <label
+                            style="font-family:var(--ff-m);font-size:.57rem;text-transform:uppercase;letter-spacing:.1em;color:var(--tx3)">Est.
+                            Avg Daily Hrs</label>
+                        <span id="modal-daily-hrs"
+                            style="font-family:var(--ff-d);font-size:1.5rem;color:var(--amb)">—</span>
+                    </div>
+                </div>
+                <div class="pm-section-label" style="margin-top:14px">Active Shifts</div>
+                <div id="m-active-shifts" class="shift-checks-wrap">
+                    <span class="mf-hint">Configure shifts in the Shifts panel first.</span>
+                </div>
+            </div>
+            <div class="modal-ftr">
+                <button class="btn btn-ghost" id="modal-cancel-btn">Cancel</button>
+                <button class="btn btn-amber" id="modal-save-btn">✓ Save Machine</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- SHIFT MODAL -->
+    <div id="shift-modal" class="modal-backdrop hidden">
+        <div class="modal">
+            <div class="modal-hdr">
+                <span class="modal-tag">SHIFT CONFIG</span>
+                <h3 id="shift-modal-title">Add Shift</h3>
+                <button id="shift-modal-close" class="modal-x">&times;</button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="shift-edit-id" />
+                <div class="mform mform-2">
+                    <div class="mf-field">
+                        <label>Shift Number</label>
+                        <select id="shift-num">
+                            <option value="1">Shift 1</option>
+                            <option value="2">Shift 2</option>
+                            <option value="3">Shift 3</option>
+                        </select>
+                    </div>
+                    <div class="mf-field">
+                        <label>Shift Name</label>
+                        <input type="text" id="shift-name" placeholder="Morning Shift…" />
+                    </div>
+                    <div class="mf-field">
+                        <label>Start Time</label>
+                        <input type="time" id="shift-start" value="08:00" />
+                    </div>
+                    <div class="mf-field">
+                        <label>End Time</label>
+                        <input type="time" id="shift-end" value="16:00" />
+                        <span class="mf-hint">00:00 = midnight / end of day</span>
+                    </div>
+                    <div class="mf-field span2">
+                        <label>Active Days</label>
+                        <div class="day-checks" id="shift-days">
+                            <label class="day-chk"><input type="checkbox" name="sd" value="0" /> Sun</label>
+                            <label class="day-chk"><input type="checkbox" name="sd" value="1" /> Mon</label>
+                            <label class="day-chk"><input type="checkbox" name="sd" value="2" /> Tue</label>
+                            <label class="day-chk"><input type="checkbox" name="sd" value="3" /> Wed</label>
+                            <label class="day-chk"><input type="checkbox" name="sd" value="4" /> Thu</label>
+                            <span class="day-chk fri-blocked" title="Friday is never a working day">Fri ✗</span>
+                            <label class="day-chk"><input type="checkbox" name="sd" value="6" /> Sat</label>
+                        </div>
+                    </div>
+                    <div class="mf-field span2">
+                        <span id="shift-duration-display" class="mf-hint"
+                            style="font-size:.72rem;color:var(--amb)">Duration: — h per active day</span>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-ftr">
+                <button class="btn btn-danger" id="shift-modal-delete" style="margin-right:auto">🗑 Delete</button>
+                <button class="btn btn-ghost" id="shift-modal-cancel">Cancel</button>
+                <button class="btn btn-amber" id="shift-modal-save">✓ Save Shift</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- PART MODAL -->
+    <div id="part-modal" class="modal-backdrop hidden">
+        <div class="modal modal-xl">
+            <div class="modal-hdr">
+                <span class="modal-tag" id="part-modal-tag">PART CONFIG</span>
+                <h3 id="part-modal-title">Edit Part</h3>
+                <button id="part-modal-close" class="modal-x">&times;</button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="part-edit-id" />
+
+                <!-- Edit-mode info bar -->
+                <div class="part-info-bar" id="part-edit-info"></div>
+
+                <!-- Add-mode identity fields -->
+                <div id="pm-add-fields" class="hidden">
+                    <div class="pm-section-label">Part Identity</div>
+                    <div class="mform mform-4">
+                        <div class="mf-field span2">
+                            <label>Part Number <span class="req">*</span></label>
+                            <input type="text" id="part-add-number" placeholder="Unique identifier (e.g. 123-456A)" />
+                        </div>
+                        <div class="mf-field span2">
+                            <label>Part Name <span class="req">*</span></label>
+                            <input type="text" id="part-add-name" placeholder="Human-readable description" />
+                        </div>
+                        <div class="mf-field">
+                            <label class="label-k9">K9 Flag</label>
+                            <input type="text" id="part-add-k9" placeholder="O = required, blank = no" />
+                        </div>
+                        <div class="mf-field">
+                            <label class="label-k10">K10 Flag</label>
+                            <input type="text" id="part-add-k10" placeholder="O = required, blank = no" />
+                        </div>
+                        <div class="mf-field">
+                            <label class="label-k11">K11 Flag</label>
+                            <input type="text" id="part-add-k11" placeholder="O = required, blank = no" />
+                        </div>
+                        <div class="mf-field">
+                            <label>Battalion QTY</label>
+                            <input type="number" id="part-add-batqty" min="0" step="1" placeholder="0" />
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Core fields (both modes) -->
+                <div class="pm-section-label">Core Fields</div>
+                <div class="mform mform-4">
+                    <div class="mf-field span2">
+                        <label>Location / Machine Type <span class="req">*</span></label>
+                        <input type="text" id="part-edit-location" placeholder="Noble, PM, Skoda…" />
+                        <span class="mf-hint">Must exactly match a configured Machine Type</span>
+                    </div>
+                    <div class="mf-field">
+                        <label>Status</label>
+                        <select id="part-edit-status">
+                            <option value="not_started">Not Started</option>
+                            <option value="in_progress">In Progress</option>
+                            <option value="complete">Complete</option>
+                        </select>
+                    </div>
+                    <div class="mf-field">
+                        <label>Shift Preference</label>
+                        <select id="part-edit-shift">
+                            <option value="">Any Shift</option>
+                            <option value="1">Shift 1 (First)</option>
+                            <option value="2">Shift 2</option>
+                            <option value="3">Shift 3 (Last)</option>
+                        </select>
+                    </div>
+                    <div class="mf-field">
+                        <label>Remaining QTY <span class="req">*</span></label>
+                        <input type="number" id="part-edit-remaining" min="0" step="0.5" />
+                        <span class="mf-hint">Decimal allowed (e.g. 7.5)</span>
+                    </div>
+                    <div class="mf-field">
+                        <label>Op. Hrs / Unit <span class="req">*</span></label>
+                        <input type="number" id="part-edit-op-hrs" min="0" step="0.01" />
+                    </div>
+                    <div class="mf-field">
+                        <label>Target Date</label>
+                        <input type="date" id="part-edit-target-date" />
+                        <span class="mf-hint">Planned completion (whole part)</span>
+                    </div>
+                </div>
+
+                <!-- Vehicle distribution -->
+                <div class="pm-section-label pm-section-dist">
+                    Vehicle Distribution
+                    <span class="pm-dist-hint">Override split across vehicles. Leave blank for auto-assignment.</span>
+                    <button type="button" class="btn-link" id="dist-auto-btn">Auto-fill</button>
+                </div>
+                <div class="mform mform-3">
+                    <div class="mf-field">
+                        <label class="label-k9">K9 Qty <span class="veh-cap">(max 18)</span></label>
+                        <input type="number" id="part-edit-k9qty" min="0" step="0.5" placeholder="Auto" />
+                    </div>
+                    <div class="mf-field">
+                        <label class="label-k10">K10 Qty <span class="veh-cap">(max 3)</span></label>
+                        <input type="number" id="part-edit-k10qty" min="0" step="0.5" placeholder="Auto" />
+                    </div>
+                    <div class="mf-field">
+                        <label class="label-k11">K11 Qty <span class="veh-cap">(max 4)</span></label>
+                        <input type="number" id="part-edit-k11qty" min="0" step="0.5" placeholder="Auto" />
+                    </div>
+                </div>
+                <div class="dist-sum-bar" id="dist-sum-bar"></div>
+
+                <!-- Per-unit schedule -->
+                <div class="pm-section-label pm-section-units">
+                    Unit Schedule
+                    <span class="pm-dist-hint">Vehicle, shift and target date per individual unit. Takes priority over
+                        distribution above.</span>
+                    <button type="button" class="btn-link" id="unit-reset-btn">Clear All</button>
+                </div>
+                <div id="unit-schedule-container" class="us-container">
+                    <p class="us-empty">Set Remaining QTY above to configure per-unit scheduling.</p>
+                </div>
+            </div>
+            <div class="modal-ftr">
+                <button class="btn btn-danger" id="part-modal-delete" style="margin-right:auto">🗑 Delete Part</button>
+                <button class="btn btn-ghost" id="part-modal-cancel">Cancel</button>
+                <button class="btn btn-amber" id="part-modal-save">✓ Save Changes</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- HEADER -->
+    <header class="app-header" id="app-header">
+        <div class="hdr-brand">
+            <div class="hdr-logo">
+                <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <rect width="32" height="32" rx="6" fill="#f59e0b" fill-opacity=".12" />
+                    <path
+                        d="M16 4v3M16 25v3M4 16h3M25 16h3M7.5 7.5l2.1 2.1M22.4 22.4l2.1 2.1M24.5 7.5l-2.1 2.1M9.6 22.4l-2.1 2.1"
+                        stroke="#f59e0b" stroke-width="2" stroke-linecap="round" />
+                    <circle cx="16" cy="16" r="5" stroke="#f59e0b" stroke-width="2" />
+                    <circle cx="16" cy="16" r="2" fill="#f59e0b" />
+                </svg>
+            </div>
+            <div class="hdr-title-block">
+                <span class="hdr-eyebrow">Machining Production Planning</span>
+                <h1 class="hdr-title">BUILDING <em>#1</em></h1>
+            </div>
+            <!-- Building switcher -->
+            <div class="bld-switcher" role="group" aria-label="Select building">
+                <button class="bld-tab active" data-bid="1" title="Building #1">B1</button>
+                <button class="bld-tab" data-bid="2" title="Building #2">B2</button>
+            </div>
+        </div>
+
+        <div class="hdr-battalion">
+            <span class="bat-pill k9">K9 <strong>×18</strong></span>
+            <span class="bat-div">/</span>
+            <span class="bat-pill k10">K10 <strong>×3</strong></span>
+            <span class="bat-div">/</span>
+            <span class="bat-pill k11">K11 <strong>×4</strong></span>
+            <span class="bat-div">—</span>
+            <span class="bat-total">25 vehicles</span>
+        </div>
+
+        <nav class="hdr-nav">
+
+            <!-- Settings -->
+            <div class="nav-dd" id="nav-dd-settings">
+                <button class="nav-btn" id="nav-dd-settings-btn" aria-expanded="false">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="3" />
+                        <path
+                            d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83" />
+                    </svg>
+                    Settings
+                </button>
+                <div class="dd-panel" id="nav-dd-settings-panel">
+                    <div class="dd-hdr"><span>Calendar &amp; Schedule</span><button class="dd-close">&times;</button>
+                    </div>
+                    <div class="dd-body">
+                        <form id="settings-form" novalidate>
+                            <div class="dd-field">
+                                <label>Plan Start Date</label>
+                                <input type="date" id="start-date" name="start_date" />
+                                <span class="dd-hint">First working day of production</span>
+                            </div>
+                            <div class="dd-field">
+                                <label>Working Day Start</label>
+                                <input type="time" id="day-start-time" name="day_start_time" value="08:00" />
+                            </div>
+                            <div class="dd-field">
+                                <label>Working Day End</label>
+                                <input type="time" id="day-end-time" name="day_end_time" value="17:00" />
+                            </div>
+                            <div class="dd-field">
+                                <label class="dd-chk-label">
+                                    <input type="checkbox" id="sat-working" name="saturday_working" />
+                                    <span>Saturday is a working day</span>
+                                </label>
+                                <span class="dd-hint">Sun–Thu always work &nbsp;·&nbsp; <strong
+                                        style="color:var(--err)">Friday never works</strong></span>
+                            </div>
+                            <div class="dd-field">
+                                <label>Op. Hours Unit</label>
+                                <select id="time-unit" name="time_unit">
+                                    <option value="h">Hours (e.g. 3.5 h)</option>
+                                    <option value="min">Minutes (e.g. 210 min)</option>
+                                </select>
+                                <span class="dd-hint">Set to <strong>Minutes</strong> if your data stores machining time
+                                    in minutes</span>
+                            </div>
+                            <button type="submit" class="btn btn-amber btn-block">✓ Save Settings</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Shifts -->
+            <div class="nav-dd" id="nav-dd-shifts">
+                <button class="nav-btn" id="nav-dd-shifts-btn" aria-expanded="false">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10" />
+                        <polyline points="12 6 12 12 16 14" />
+                    </svg>
+                    Shifts
+                </button>
+                <div class="dd-panel dd-wide" id="nav-dd-shifts-panel">
+                    <div class="dd-hdr"><span>Shift Configuration</span><button class="dd-close">&times;</button></div>
+                    <div class="dd-body">
+                        <p class="dd-hint">Define shifts with operating hours and days. Assign machines to shifts.</p>
+                        <div id="shifts-config-wrap"><em class="dd-hint">Loading…</em></div>
+                        <button class="btn btn-outline btn-sm btn-block" id="add-shift-btn" style="margin-top:8px">+ Add
+                            / Edit Shift</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Data -->
+            <div class="nav-dd" id="nav-dd-data">
+                <button class="nav-btn" id="nav-dd-data-btn" aria-expanded="false">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                        <polyline points="17 8 12 3 7 8" />
+                        <line x1="12" y1="3" x2="12" y2="15" />
+                    </svg>
+                    Data
+                </button>
+                <div class="dd-panel" id="nav-dd-data-panel">
+                    <div class="dd-hdr"><span>Data Management</span><button class="dd-close">&times;</button></div>
+                    <div class="dd-body">
+                        <p class="dd-hint">Download the template → fill <strong>Sheet 1</strong> → upload. Sheet 2
+                            explains every column.</p>
+                        <button class="btn btn-outline btn-block" id="download-template-btn">↓ Download Template
+                            (.xlsx)</button>
+                        <div class="dd-rule"></div>
+                        <label class="drop-zone" for="xlsx-upload" id="file-drop-zone">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="1.5">
+                                <path d="M4 16v1a3 3 0 0 0 3 3h10a3 3 0 0 0 3-3v-1" />
+                                <polyline points="16 6 12 2 8 6" />
+                                <line x1="12" y1="2" x2="12" y2="15" />
+                            </svg>
+                            <span id="file-name-display">Drop .xlsx or .csv here, or click to browse</span>
+                        </label>
+                        <input type="file" id="xlsx-upload" accept=".xlsx,.xls,.csv" class="visually-hidden" />
+                        <button class="btn btn-teal btn-block" id="upload-btn" disabled>↑ Upload &amp; Process</button>
+                        <div class="dd-rule"></div>
+                        <div class="dd-stats">
+                            <div class="dd-stat"><span>Parts in DB</span><strong id="parts-db-count">—</strong></div>
+                            <div class="dd-stat"><span>Active</span><strong id="parts-active-count">—</strong></div>
+                            <div class="dd-stat"><span>Tasks</span><strong id="tasks-total-count">—</strong></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </nav>
+
+        <div class="hdr-right">
+            <div class="conn-status" id="connection-status">
+                <span class="conn-dot" id="status-dot"></span>
+                <span id="status-text">Connecting…</span>
+            </div>
+            <button id="theme-toggle-btn" class="btn-theme" title="Toggle theme">☀</button>
+        </div>
+    </header>
+    <div id="dd-backdrop" class="dd-backdrop hidden"></div>
+
+    <!-- MAIN -->
+    <main class="app-main">
+
+        <section class="panel" id="panel-machines">
+            <div class="panel-hdr">
+                <div class="panel-hdr-left"><span class="panel-icon">⚙</span>
+                    <h2>Machine Management</h2>
+                </div>
+                <button class="btn btn-amber btn-sm" id="add-machine-btn">+ Add Machine</button>
+            </div>
+            <div id="machines-table-wrap" class="panel-body-flush">
+                <div class="empty-state">
+                    <p>No machines configured. Click <strong>+ Add Machine</strong> to get started.</p>
+                </div>
+            </div>
+        </section>
+
+        <section class="panel" id="panel-overview">
+            <div class="panel-hdr">
+                <div class="panel-hdr-left"><span class="panel-icon">◉</span>
+                    <h2>Plan Overview</h2>
+                </div>
+                <span id="last-updated" class="last-upd"></span>
+            </div>
+            <div class="panel-body">
+                <div class="kpi-row">
+                    <div class="kpi-card">
+                        <div class="kpi-top"><span class="ki">🔩</span><span class="kl">Unique Parts</span></div>
+                        <div class="kv" id="kpi-parts">—</div>
+                        <div class="ks" id="kpi-parts-sub">Remaining qty &gt; 0</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-top"><span class="ki">🔢</span><span class="kl">Total Unit Tasks</span></div>
+                        <div class="kv" id="kpi-tasks">—</div>
+                        <div class="ks" id="kpi-tasks-sub">Sum of remaining qty</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-top"><span class="ki">⏱</span><span class="kl">Total Op. Hours</span></div>
+                        <div class="kv" id="kpi-hours">—</div>
+                        <div class="ks" id="kpi-hours-sub">Σ op_hrs × qty</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-top"><span class="ki">📅</span><span class="kl">Working Days</span></div>
+                        <div class="kv" id="kpi-days">—</div>
+                        <div class="ks" id="kpi-days-sub">Bottleneck completion</div>
+                    </div>
+                    <div class="kpi-card kpi-accent">
+                        <div class="kpi-top"><span class="ki">🏁</span><span class="kl">Projected End Date</span></div>
+                        <div class="kv" id="kpi-end-date">—</div>
+                        <div class="ks" id="kpi-end-sub">Based on settings</div>
+                    </div>
+                </div>
+                <div class="vbd-wrap" id="vehicle-breakdown">
+                    <div class="vbd-empty">Upload data to see vehicle breakdown</div>
+                </div>
+            </div>
+        </section>
+
+        <section class="panel" id="panel-parts">
+            <div class="panel-hdr">
+                <div class="panel-hdr-left"><span class="panel-icon">☰</span>
+                    <h2>Master Parts Data</h2>
+                </div>
+                <div class="panel-tools">
+                    <div class="search-box">
+                        <svg class="search-ico" width="13" height="13" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="2.5">
+                            <circle cx="11" cy="11" r="8" />
+                            <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                        </svg>
+                        <input type="text" id="parts-search" class="search-inp" placeholder="Part number or name…"
+                            autocomplete="off" />
+                        <button id="parts-search-clear" class="search-x hidden">&times;</button>
+                    </div>
+                    <select id="filter-location" class="fsel">
+                        <option value="">All Locations</option>
+                    </select>
+                    <select id="filter-status" class="fsel">
+                        <option value="">All Statuses</option>
+                        <option value="not_started">Not Started</option>
+                        <option value="in_progress">In Progress</option>
+                        <option value="complete">Complete</option>
+                    </select>
+                    <select id="filter-vehicle" class="fsel">
+                        <option value="">All Vehicles</option>
+                        <option value="K9">K9</option>
+                        <option value="K10">K10</option>
+                        <option value="K11">K11</option>
+                    </select>
+                    <span id="parts-count" class="row-count"></span>
+                    <button class="btn btn-outline btn-sm" id="add-part-btn">+ Add Part</button>
+                </div>
+            </div>
+            <div class="panel-body-flush">
+                <div id="parts-table-wrap" class="scroll-wrap">
+                    <div class="empty-state"><em>Upload data or click "+ Add Part" to add parts.</em></div>
+                </div>
+            </div>
+        </section>
+
+        <section class="panel" id="panel-gantt">
+            <div class="panel-hdr">
+                <div class="panel-hdr-left"><span class="panel-icon">▥</span>
+                    <h2>Production Schedule</h2>
+                </div>
+                <div class="panel-tools">
+                    <div class="gv-switcher" role="group">
+                        <button class="gv-btn" data-view="machine" title="1 row per machine, tasks as blocks">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2.2">
+                                <rect x="3" y="4" width="18" height="4" rx="1" />
+                                <rect x="3" y="11" width="18" height="4" rx="1" />
+                                <rect x="3" y="18" width="18" height="4" rx="1" />
+                            </svg>
+                            Machine
+                        </button>
+                        <button class="gv-btn active" data-view="part"
+                            title="1 row per part, full span with vehicle breakdown">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2.2">
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                                <polyline points="14 2 14 8 20 8" />
+                                <line x1="8" y1="13" x2="16" y2="13" />
+                                <line x1="8" y1="17" x2="16" y2="17" />
+                            </svg>
+                            Part
+                        </button>
+                        <button class="gv-btn" data-view="weekly" title="Zoomed out — week columns">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2.2">
+                                <rect x="3" y="4" width="18" height="18" rx="2" />
+                                <line x1="16" y1="2" x2="16" y2="6" />
+                                <line x1="8" y1="2" x2="8" y2="6" />
+                                <line x1="3" y1="10" x2="21" y2="10" />
+                            </svg>
+                            Weekly
+                        </button>
+                    </div>
+                    <div class="search-box">
+                        <svg class="search-ico" width="13" height="13" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="2.5">
+                            <circle cx="11" cy="11" r="8" />
+                            <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                        </svg>
+                        <input type="text" id="gantt-search" class="search-inp" placeholder="Search part…"
+                            autocomplete="off" />
+                        <button id="gantt-search-clear" class="search-x hidden">&times;</button>
+                    </div>
+                    <select id="gantt-filter-machine" class="fsel">
+                        <option value="">All Machines</option>
+                    </select>
+                    <select id="gantt-filter-vehicle" class="fsel">
+                        <option value="">All Vehicles</option>
+                        <option value="K9">K9</option>
+                        <option value="K10">K10</option>
+                        <option value="K11">K11</option>
+                    </select>
+                    <div class="gantt-legend">
+                        <span class="gl-dot k9"></span><span class="gl-lbl">K9</span>
+                        <span class="gl-dot k10"></span><span class="gl-lbl">K10</span>
+                        <span class="gl-dot k11"></span><span class="gl-lbl">K11</span>
+                    </div>
+                    <button class="btn btn-outline btn-sm" id="export-report-btn">📊 Export</button>
+                </div>
+            </div>
+            <div class="panel-body-flush gantt-body">
+                <div id="gantt-container" class="gantt-container">
+                    <div class="gantt-empty">
+                        <div class="ge-ico">▥</div>
+                        <p class="ge-title">No Production Schedule</p>
+                        <p class="ge-sub">Add machines, configure shifts, and upload parts data</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Gantt rich tooltip -->
+    <div id="gantt-tooltip" class="gantt-tooltip hidden"></div>
+
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+    <script type="module" src="app.js?v=18"></script>
+</body>
+
+</html>

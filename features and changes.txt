@@ -1,0 +1,8 @@
+1. change the week logic, start on Saturday and end is Friday, and the weekend is Friday and Saturday
+2. The day start of the day is 8 A.M and end of day is set by me, so that should be taken in to consideration in the Gantt chart and the plan
+3. Allow to set the date for each one of teh quantity of the parts
+4. Add shift logic so that when I add two shifts the load is distributed on the two shifts
+5. Allow to add the shift start and end time
+6. Allow to delete parts
+7. Allow to export reports and charts, as pdf and excel (add styling to the excel)
+8. Fix the light theme so that it is visually better and the colors ablt to all the elements
