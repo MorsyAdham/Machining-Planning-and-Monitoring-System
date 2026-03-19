@@ -491,6 +491,18 @@
     color: var(--tx3);
 }
 
+:root[data-theme="light"] .gh-corner-title {
+    color: var(--tx2);
+}
+
+:root[data-theme="light"] .gh-corner-sub {
+    color: var(--tx3);
+}
+
+:root[data-theme="light"] .gd-mon {
+    color: var(--tx3);
+}
+
 :root[data-theme="light"] .g-date {
     background: var(--s1);
     border-right-color: var(--bd);
@@ -1611,14 +1623,6 @@ textarea {
     margin-bottom: 10px;
 }
 
-.dd-field label {
-    font-family: var(--ff-m);
-    font-size: .62rem;
-    letter-spacing: .1em;
-    text-transform: uppercase;
-    color: var(--tx3);
-}
-
 .dd-field input {
     background: var(--inp-bg);
     border: 1px solid var(--inp-bd);
@@ -2377,8 +2381,6 @@ textarea {
     display: block;
 }
 
-.pm-edit-fields {}
-
 /* ── Main layout ─────────────────────────────────────────── */
 .app-main {
     max-width: 1600px;
@@ -2540,7 +2542,6 @@ textarea {
 }
 
 /* Vehicle breakdown */
-.vbd-wrap {}
 
 .vbd-empty {
     font-family: var(--ff-m);
@@ -2556,8 +2557,6 @@ textarea {
     flex-direction: column;
     gap: 10px;
 }
-
-.vbd-item {}
 
 .vbd-hdr {
     display: flex;
@@ -3990,6 +3989,11 @@ textarea {
     background: var(--s1);
 }
 
+:root[data-theme="light"] .gt-head {
+    background: var(--s2);
+    border-bottom-color: var(--bd);
+}
+
 /* ── Connection status ───────────────────────────────────── */
 .hdr-right {
     display: flex;
@@ -4134,4 +4138,223 @@ textarea {
     .mform-4 {
         grid-template-columns: 1fr 1fr;
     }
+}
+
+/* ── Panel collapse ─────────────────────────────────────── */
+.panel-collapsible .panel-collapse-btn {
+    background: none;
+    border: none;
+    color: var(--tx3);
+    cursor: pointer;
+    padding: 2px 4px;
+    border-radius: 3px;
+    display: flex;
+    align-items: center;
+    transition: color .14s, background .14s;
+    flex-shrink: 0;
+}
+
+.panel-collapsible .panel-collapse-btn:hover {
+    color: var(--amb);
+    background: var(--s3);
+}
+
+.panel-collapsible.is-collapsed .collapse-icon {
+    transform: rotate(-90deg);
+}
+
+.panel-collapsible.is-collapsed .panel-body-flush {
+    display: none;
+}
+
+.panel-collapsible .collapse-icon {
+    transition: transform .2s ease;
+}
+
+.panel-hdr-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: auto;
+}
+
+.panel-count {
+    font-family: var(--ff-m);
+    font-size: .6rem;
+    background: var(--s3);
+    color: var(--tx3);
+    border: 1px solid var(--bd);
+    padding: 1px 7px;
+    border-radius: 10px;
+    letter-spacing: .06em;
+}
+
+/* ── Refresh button ──────────────────────────────────────── */
+.btn-icon-sm {
+    background: none;
+    border: 1px solid var(--bd);
+    color: var(--tx3);
+    border-radius: var(--r-sm);
+    padding: 4px 6px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    transition: all .14s;
+}
+
+.btn-icon-sm:hover {
+    color: var(--amb);
+    border-color: var(--amb);
+    background: var(--ambd);
+}
+
+.btn-icon-sm.spinning svg {
+    animation: spin .8s linear infinite;
+}
+
+/* ── Enhanced empty states ────────────────────────────────── */
+.empty-state {
+    padding: 40px 20px;
+    text-align: center;
+    font-family: var(--ff-m);
+    font-size: .72rem;
+    color: var(--tx3);
+    font-style: italic;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+}
+
+.empty-state strong {
+    color: var(--tx2);
+    font-style: normal;
+}
+
+.es-icon {
+    font-size: 1.8rem;
+    opacity: .35;
+    line-height: 1;
+}
+
+.es-title {
+    font-family: var(--ff-d);
+    font-size: .9rem;
+    font-weight: 700;
+    letter-spacing: .06em;
+    color: var(--tx2);
+    text-transform: uppercase;
+    font-style: normal;
+    margin-top: 4px;
+}
+
+.empty-state p {
+    font-style: normal;
+    color: var(--tx3);
+    font-size: .7rem;
+    max-width: 280px;
+    line-height: 1.5;
+}
+
+.es-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+    margin-top: 8px;
+    flex-wrap: wrap;
+}
+
+/* ── Gantt empty state CTA ───────────────────────────────── */
+.ge-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+    margin-top: 12px;
+    flex-wrap: wrap;
+}
+
+/* ── Keyboard shortcuts modal ─────────────────────────────── */
+.modal-sm {
+    max-width: 380px;
+}
+
+.shortcuts-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.sc-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 5px 0;
+    border-bottom: 1px solid var(--bd);
+}
+
+.sc-row:last-child {
+    border-bottom: none;
+}
+
+.sc-row kbd {
+    font-family: var(--ff-m);
+    font-size: .66rem;
+    background: var(--s3);
+    border: 1px solid var(--bd2);
+    border-radius: 4px;
+    padding: 3px 8px;
+    color: var(--amb);
+    white-space: nowrap;
+    min-width: 70px;
+    text-align: center;
+    flex-shrink: 0;
+}
+
+.sc-row span {
+    font-family: var(--ff-b);
+    font-size: .76rem;
+    color: var(--tx2);
+}
+
+/* ── Accessible focus states ──────────────────────────────── */
+:focus-visible {
+    outline: 2px solid var(--amb);
+    outline-offset: 2px;
+}
+
+button:focus-visible,
+input:focus-visible,
+select:focus-visible {
+    outline: 2px solid var(--amb);
+    outline-offset: 2px;
+}
+
+/* ── Table row hover action reveal ───────────────────────── */
+.parts-table tbody tr .row-actions {
+    opacity: 0;
+    transition: opacity .12s;
+}
+
+.parts-table tbody tr:hover .row-actions {
+    opacity: 1;
+}
+
+.machines-table tbody tr .row-actions {
+    opacity: 0;
+    transition: opacity .12s;
+}
+
+.machines-table tbody tr:hover .row-actions {
+    opacity: 1;
+}
+
+/* ── Spinning animation ──────────────────────────────────── */
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.spinning svg {
+    animation: spin .8s linear infinite;
 }

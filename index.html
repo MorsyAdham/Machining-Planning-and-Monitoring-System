@@ -33,6 +33,32 @@
     <!-- TOAST -->
     <div id="toast" class="toast hidden" role="alert"></div>
 
+    <!-- KEYBOARD SHORTCUTS MODAL -->
+    <div id="shortcuts-modal" class="modal-backdrop hidden">
+        <div class="modal modal-sm">
+            <div class="modal-hdr">
+                <span class="modal-tag">KEYBOARD</span>
+                <h3>Shortcuts</h3>
+                <button class="modal-x" id="shortcuts-close">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="shortcuts-grid">
+                    <div class="sc-row"><kbd>?</kbd><span>Show this help</span></div>
+                    <div class="sc-row"><kbd>N</kbd><span>Add new part</span></div>
+                    <div class="sc-row"><kbd>M</kbd><span>Add new machine</span></div>
+                    <div class="sc-row"><kbd>Ctrl+U</kbd><span>Upload data</span></div>
+                    <div class="sc-row"><kbd>Ctrl+S</kbd><span>Save settings</span></div>
+                    <div class="sc-row"><kbd>Esc</kbd><span>Close modal / cancel</span></div>
+                    <div class="sc-row"><kbd>Ctrl+F</kbd><span>Focus search</span></div>
+                    <div class="sc-row"><kbd>T</kbd><span>Jump to today (Gantt)</span></div>
+                    <div class="sc-row"><kbd>1</kbd><span>Machine view (Gantt)</span></div>
+                    <div class="sc-row"><kbd>2</kbd><span>Part view (Gantt)</span></div>
+                    <div class="sc-row"><kbd>3</kbd><span>Weekly view (Gantt)</span></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- REPORTS MODAL -->
     <div id="reports-modal" class="modal-backdrop hidden">
         <div class="modal">
@@ -54,6 +80,18 @@
                         📅 Export Production Schedule (.xlsx)<br>
                         <span style="font-size:.66rem;color:var(--tx3);font-family:var(--ff-m)">Full task list with
                             machine assignments and estimated dates</span>
+                    </button>
+                    <button class="btn btn-outline btn-block" id="rpt-machine-btn">
+                        ⚙ Export Machine Utilization (.xlsx)<br>
+                        <span style="font-size:.66rem;color:var(--tx3);font-family:var(--ff-m)">Per-machine load, hours and utilization percentage</span>
+                    </button>
+                    <button class="btn btn-outline btn-block" id="rpt-weekly-btn">
+                        📆 Export Weekly Plan (.xlsx)<br>
+                        <span style="font-size:.66rem;color:var(--tx3);font-family:var(--ff-m)">Week-by-week production breakdown</span>
+                    </button>
+                    <button class="btn btn-outline btn-block" id="rpt-summary-btn">
+                        📊 Export Executive Summary (.xlsx)<br>
+                        <span style="font-size:.66rem;color:var(--tx3);font-family:var(--ff-m)">KPI dashboard with battalion breakdown</span>
                     </button>
                     <button class="btn btn-outline btn-block" id="rpt-print-btn">
                         🖨 Print Schedule<br>
@@ -450,7 +488,7 @@
                 <span class="conn-dot" id="status-dot"></span>
                 <span id="status-text">Connecting…</span>
             </div>
-            <button id="theme-toggle-btn" class="btn-theme" title="Toggle theme">☀</button>
+            <button id="theme-toggle-btn" class="btn-theme" title="Toggle theme" aria-label="Toggle theme">☀</button>
         </div>
     </header>
     <div id="dd-backdrop" class="dd-backdrop hidden"></div>
@@ -458,16 +496,24 @@
     <!-- MAIN -->
     <main class="app-main">
 
-        <section class="panel" id="panel-machines">
+        <section class="panel panel-collapsible" id="panel-machines">
             <div class="panel-hdr">
-                <div class="panel-hdr-left"><span class="panel-icon">⚙</span>
+                <div class="panel-hdr-left">
+                    <button class="panel-collapse-btn" aria-label="Collapse panel" title="Collapse/Expand">
+                        <svg class="collapse-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+                    </button>
+                    <span class="panel-icon">⚙</span>
                     <h2>Machine Management</h2>
+                    <span class="panel-count" id="machines-count"></span>
                 </div>
                 <button class="btn btn-amber btn-sm" id="add-machine-btn">+ Add Machine</button>
             </div>
             <div id="machines-table-wrap" class="panel-body-flush">
                 <div class="empty-state">
-                    <p>No machines configured. Click <strong>+ Add Machine</strong> to get started.</p>
+                    <div class="es-icon">⚙</div>
+                    <p class="es-title">No machines configured</p>
+                    <p>Add machines to start scheduling production tasks.</p>
+                    <button class="btn btn-outline btn-sm" id="es-add-machine-btn">+ Add Machine</button>
                 </div>
             </div>
         </section>
@@ -477,32 +523,37 @@
                 <div class="panel-hdr-left"><span class="panel-icon">◉</span>
                     <h2>Plan Overview</h2>
                 </div>
-                <span id="last-updated" class="last-upd"></span>
+                <div class="panel-hdr-right">
+                    <span id="last-updated" class="last-upd"></span>
+                    <button class="btn-icon-sm" id="refresh-btn" title="Refresh data (Ctrl+R)" aria-label="Refresh data">
+                        <svg id="refresh-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+                    </button>
+                </div>
             </div>
             <div class="panel-body">
                 <div class="kpi-row">
                     <div class="kpi-card">
-                        <div class="kpi-top"><span class="ki">🔩</span><span class="kl">Unique Parts</span></div>
+                        <div class="kpi-top"><span class="ki" aria-label="Unique Parts">🔩</span><span class="kl">Unique Parts</span></div>
                         <div class="kv" id="kpi-parts">—</div>
                         <div class="ks" id="kpi-parts-sub">Remaining qty &gt; 0</div>
                     </div>
                     <div class="kpi-card">
-                        <div class="kpi-top"><span class="ki">🔢</span><span class="kl">Total Unit Tasks</span></div>
+                        <div class="kpi-top"><span class="ki" aria-label="Total Unit Tasks">🔢</span><span class="kl">Total Unit Tasks</span></div>
                         <div class="kv" id="kpi-tasks">—</div>
                         <div class="ks" id="kpi-tasks-sub">Sum of remaining qty</div>
                     </div>
                     <div class="kpi-card">
-                        <div class="kpi-top"><span class="ki">⏱</span><span class="kl">Total Op. Hours</span></div>
+                        <div class="kpi-top"><span class="ki" aria-label="Total Op. Hours">⏱</span><span class="kl">Total Op. Hours</span></div>
                         <div class="kv" id="kpi-hours">—</div>
                         <div class="ks" id="kpi-hours-sub">Σ op_hrs × qty</div>
                     </div>
                     <div class="kpi-card">
-                        <div class="kpi-top"><span class="ki">📅</span><span class="kl">Working Days</span></div>
+                        <div class="kpi-top"><span class="ki" aria-label="Working Days">📅</span><span class="kl">Working Days</span></div>
                         <div class="kv" id="kpi-days">—</div>
                         <div class="ks" id="kpi-days-sub">Bottleneck completion</div>
                     </div>
                     <div class="kpi-card kpi-accent">
-                        <div class="kpi-top"><span class="ki">🏁</span><span class="kl">Projected End Date</span></div>
+                        <div class="kpi-top"><span class="ki" aria-label="Projected End Date">🏁</span><span class="kl">Projected End Date</span></div>
                         <div class="kv" id="kpi-end-date">—</div>
                         <div class="ks" id="kpi-end-sub">Based on settings</div>
                     </div>
@@ -513,10 +564,15 @@
             </div>
         </section>
 
-        <section class="panel" id="panel-parts">
+        <section class="panel panel-collapsible" id="panel-parts">
             <div class="panel-hdr">
-                <div class="panel-hdr-left"><span class="panel-icon">☰</span>
+                <div class="panel-hdr-left">
+                    <button class="panel-collapse-btn" aria-label="Collapse panel" title="Collapse/Expand">
+                        <svg class="collapse-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+                    </button>
+                    <span class="panel-icon">☰</span>
                     <h2>Master Parts Data</h2>
+                    <span class="panel-count" id="parts-table-count"></span>
                 </div>
                 <div class="panel-tools">
                     <div class="search-box">
@@ -548,17 +604,28 @@
                     <button class="btn btn-outline btn-sm" id="add-part-btn">+ Add Part</button>
                 </div>
             </div>
-            <div class="panel-body-flush">
-                <div id="parts-table-wrap" class="scroll-wrap">
-                    <div class="empty-state"><em>Upload data or click "+ Add Part" to add parts.</em></div>
+            <div id="parts-table-wrap" class="scroll-wrap panel-body-flush">
+                <div class="empty-state">
+                    <div class="es-icon">📋</div>
+                    <p class="es-title">No parts data yet</p>
+                    <p>Upload an Excel file or add parts manually to begin.</p>
+                    <div class="es-actions">
+                        <button class="btn btn-outline btn-sm" id="es-upload-parts-btn">↑ Upload Excel</button>
+                        <button class="btn btn-teal btn-sm" id="es-add-part-btn">+ Add Part</button>
+                    </div>
                 </div>
             </div>
         </section>
 
-        <section class="panel" id="panel-gantt">
+        <section class="panel panel-collapsible" id="panel-gantt">
             <div class="panel-hdr">
-                <div class="panel-hdr-left"><span class="panel-icon">▥</span>
+                <div class="panel-hdr-left">
+                    <button class="panel-collapse-btn" aria-label="Collapse panel" title="Collapse/Expand">
+                        <svg class="collapse-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+                    </button>
+                    <span class="panel-icon">▥</span>
                     <h2>Production Schedule</h2>
+                    <span class="panel-count" id="gantt-task-count"></span>
                 </div>
                 <div class="panel-tools">
                     <div class="gv-switcher" role="group">
@@ -612,6 +679,7 @@
                         <option value="K10">K10</option>
                         <option value="K11">K11</option>
                     </select>
+                    <button class="btn btn-sm btn-ghost" id="gantt-today-btn" title="Jump to today">⬡ Today</button>
                     <div class="gantt-legend">
                         <span class="gl-dot k9"></span><span class="gl-lbl">K9</span>
                         <span class="gl-dot k10"></span><span class="gl-lbl">K10</span>
@@ -626,6 +694,10 @@
                         <div class="ge-ico">▥</div>
                         <p class="ge-title">No Production Schedule</p>
                         <p class="ge-sub">Add machines, configure shifts, and upload parts data</p>
+                        <div class="ge-actions">
+                            <button class="btn btn-outline btn-sm" id="ge-add-machine-btn">+ Add Machine</button>
+                            <button class="btn btn-outline btn-sm" id="ge-upload-btn">↑ Upload Parts</button>
+                        </div>
                     </div>
                 </div>
             </div>
