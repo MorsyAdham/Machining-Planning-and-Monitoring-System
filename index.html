@@ -61,43 +61,131 @@
 
     <!-- REPORTS MODAL -->
     <div id="reports-modal" class="modal-backdrop hidden">
-        <div class="modal">
+        <div class="modal modal-lg">
             <div class="modal-hdr">
                 <span class="modal-tag">REPORTS</span>
                 <h3>Export &amp; Reports</h3>
                 <button class="modal-x" id="reports-close">&times;</button>
             </div>
             <div class="modal-body">
-                <p style="font-size:.8rem;color:var(--tx2);margin-bottom:16px">Export production data to Excel for
-                    offline review or reporting.</p>
-                <div style="display:flex;flex-direction:column;gap:10px">
-                    <button class="btn btn-outline btn-block" id="rpt-parts-btn">
-                        📋 Export Parts List (.xlsx)<br>
-                        <span style="font-size:.66rem;color:var(--tx3);font-family:var(--ff-m)">All parts with vehicle
-                            flags, op hours, status</span>
-                    </button>
-                    <button class="btn btn-outline btn-block" id="rpt-sched-btn">
-                        📅 Export Production Schedule (.xlsx)<br>
-                        <span style="font-size:.66rem;color:var(--tx3);font-family:var(--ff-m)">Full task list with
-                            machine assignments and estimated dates</span>
-                    </button>
-                    <button class="btn btn-outline btn-block" id="rpt-machine-btn">
-                        ⚙ Export Machine Utilization (.xlsx)<br>
-                        <span style="font-size:.66rem;color:var(--tx3);font-family:var(--ff-m)">Per-machine load, hours and utilization percentage</span>
-                    </button>
-                    <button class="btn btn-outline btn-block" id="rpt-weekly-btn">
-                        📆 Export Weekly Plan (.xlsx)<br>
-                        <span style="font-size:.66rem;color:var(--tx3);font-family:var(--ff-m)">Week-by-week production breakdown</span>
-                    </button>
-                    <button class="btn btn-outline btn-block" id="rpt-summary-btn">
-                        📊 Export Executive Summary (.xlsx)<br>
-                        <span style="font-size:.66rem;color:var(--tx3);font-family:var(--ff-m)">KPI dashboard with battalion breakdown</span>
-                    </button>
-                    <button class="btn btn-outline btn-block" id="rpt-print-btn">
-                        🖨 Print Schedule<br>
-                        <span style="font-size:.66rem;color:var(--tx3);font-family:var(--ff-m)">Opens the browser print
-                            dialog</span>
-                    </button>
+                <p class="reports-intro">Export production data for offline review, presentation, or printing. Choose Excel for editable data or PDF for formatted reports.</p>
+                <div class="reports-grid">
+
+                    <!-- Parts List -->
+                    <div class="rpt-card">
+                        <div class="rpt-card-hdr">
+                            <div class="rpt-icon rpt-icon--parts">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+                            </div>
+                            <div class="rpt-card-titles">
+                                <h4>Parts List</h4>
+                                <p>All parts with vehicle flags, op hours, status</p>
+                            </div>
+                        </div>
+                        <div class="rpt-card-actions">
+                            <button class="rpt-btn rpt-btn--xlsx" id="rpt-parts-xlsx">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                                Excel
+                            </button>
+                            <button class="rpt-btn rpt-btn--pdf" id="rpt-parts-pdf">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
+                                PDF
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Production Schedule -->
+                    <div class="rpt-card">
+                        <div class="rpt-card-hdr">
+                            <div class="rpt-icon rpt-icon--schedule">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><path d="M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01M16 18h.01"/></svg>
+                            </div>
+                            <div class="rpt-card-titles">
+                                <h4>Production Schedule</h4>
+                                <p>Full task list with machine assignments and dates</p>
+                            </div>
+                        </div>
+                        <div class="rpt-card-actions">
+                            <button class="rpt-btn rpt-btn--xlsx" id="rpt-sched-xlsx">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                                Excel
+                            </button>
+                            <button class="rpt-btn rpt-btn--pdf" id="rpt-sched-pdf">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
+                                PDF
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Machine Utilization -->
+                    <div class="rpt-card">
+                        <div class="rpt-card-hdr">
+                            <div class="rpt-icon rpt-icon--machine">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93l-1.41 1.41M4.93 4.93l1.41 1.41M20 12h-2M6 12H4M19.07 19.07l-1.41-1.41M4.93 19.07l1.41-1.41M12 20v-2M12 6V4"/></svg>
+                            </div>
+                            <div class="rpt-card-titles">
+                                <h4>Machine Utilization</h4>
+                                <p>Per-machine load, hours and utilization percentage</p>
+                            </div>
+                        </div>
+                        <div class="rpt-card-actions">
+                            <button class="rpt-btn rpt-btn--xlsx" id="rpt-machine-xlsx">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                                Excel
+                            </button>
+                            <button class="rpt-btn rpt-btn--pdf" id="rpt-machine-pdf">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
+                                PDF
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Weekly Plan -->
+                    <div class="rpt-card">
+                        <div class="rpt-card-hdr">
+                            <div class="rpt-icon rpt-icon--weekly">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="9" y1="14" x2="15" y2="14"/><line x1="12" y1="11" x2="12" y2="17"/></svg>
+                            </div>
+                            <div class="rpt-card-titles">
+                                <h4>Weekly Plan</h4>
+                                <p>Week-by-week production breakdown by machine</p>
+                            </div>
+                        </div>
+                        <div class="rpt-card-actions">
+                            <button class="rpt-btn rpt-btn--xlsx" id="rpt-weekly-xlsx">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                                Excel
+                            </button>
+                            <button class="rpt-btn rpt-btn--pdf" id="rpt-weekly-pdf">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
+                                PDF
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Executive Summary -->
+                    <div class="rpt-card rpt-card--accent">
+                        <div class="rpt-card-hdr">
+                            <div class="rpt-icon rpt-icon--summary">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+                            </div>
+                            <div class="rpt-card-titles">
+                                <h4>Executive Summary</h4>
+                                <p>KPI dashboard with battalion breakdown and KPIs</p>
+                            </div>
+                        </div>
+                        <div class="rpt-card-actions">
+                            <button class="rpt-btn rpt-btn--xlsx" id="rpt-summary-xlsx">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                                Excel
+                            </button>
+                            <button class="rpt-btn rpt-btn--pdf" id="rpt-summary-pdf">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
+                                PDF
+                            </button>
+                        </div>
+                    </div>
+
                 </div>
             </div>
             <div class="modal-ftr">
@@ -202,7 +290,10 @@
                 </div>
             </div>
             <div class="modal-ftr">
-                <button class="btn btn-danger" id="shift-modal-delete" style="margin-right:auto">🗑 Delete</button>
+                <button class="btn btn-danger" id="shift-modal-delete" style="margin-right:auto">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                    Delete
+                </button>
                 <button class="btn btn-ghost" id="shift-modal-cancel">Cancel</button>
                 <button class="btn btn-amber" id="shift-modal-save">✓ Save Shift</button>
             </div>
@@ -329,7 +420,10 @@
                 </div>
             </div>
             <div class="modal-ftr">
-                <button class="btn btn-danger" id="part-modal-delete" style="margin-right:auto">🗑 Delete Part</button>
+                <button class="btn btn-danger" id="part-modal-delete" style="margin-right:auto">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                    Delete Part
+                </button>
                 <button class="btn btn-ghost" id="part-modal-cancel">Cancel</button>
                 <button class="btn btn-amber" id="part-modal-save">✓ Save Changes</button>
             </div>
@@ -488,7 +582,9 @@
                 <span class="conn-dot" id="status-dot"></span>
                 <span id="status-text">Connecting…</span>
             </div>
-            <button id="theme-toggle-btn" class="btn-theme" title="Toggle theme" aria-label="Toggle theme">☀</button>
+            <button id="theme-toggle-btn" class="btn-theme" title="Toggle theme" aria-label="Toggle theme">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+            </button>
         </div>
     </header>
     <div id="dd-backdrop" class="dd-backdrop hidden"></div>
@@ -502,7 +598,9 @@
                     <button class="panel-collapse-btn" aria-label="Collapse panel" title="Collapse/Expand">
                         <svg class="collapse-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
                     </button>
-                    <span class="panel-icon">⚙</span>
+                    <span class="panel-icon">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93l-1.41 1.41M4.93 4.93l1.41 1.41M20 12h-2M6 12H4M19.07 19.07l-1.41-1.41M4.93 19.07l1.41-1.41M12 20v-2M12 6V4"/></svg>
+                    </span>
                     <h2>Machine Management</h2>
                     <span class="panel-count" id="machines-count"></span>
                 </div>
@@ -510,7 +608,9 @@
             </div>
             <div id="machines-table-wrap" class="panel-body-flush">
                 <div class="empty-state">
-                    <div class="es-icon">⚙</div>
+                    <div class="es-icon">
+                        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93l-1.41 1.41M4.93 4.93l1.41 1.41M20 12h-2M6 12H4M19.07 19.07l-1.41-1.41M4.93 19.07l1.41-1.41M12 20v-2M12 6V4"/></svg>
+                    </div>
                     <p class="es-title">No machines configured</p>
                     <p>Add machines to start scheduling production tasks.</p>
                     <button class="btn btn-outline btn-sm" id="es-add-machine-btn">+ Add Machine</button>
@@ -520,7 +620,9 @@
 
         <section class="panel" id="panel-overview">
             <div class="panel-hdr">
-                <div class="panel-hdr-left"><span class="panel-icon">◉</span>
+                <div class="panel-hdr-left"><span class="panel-icon">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+                    </span>
                     <h2>Plan Overview</h2>
                 </div>
                 <div class="panel-hdr-right">
@@ -533,27 +635,52 @@
             <div class="panel-body">
                 <div class="kpi-row">
                     <div class="kpi-card">
-                        <div class="kpi-top"><span class="ki" aria-label="Unique Parts">🔩</span><span class="kl">Unique Parts</span></div>
+                        <div class="kpi-icon-box kpi-icon-box--parts">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>
+                            </svg>
+                        </div>
+                        <div class="kpi-top"><span class="kl">Unique Parts</span></div>
                         <div class="kv" id="kpi-parts">—</div>
                         <div class="ks" id="kpi-parts-sub">Remaining qty &gt; 0</div>
                     </div>
                     <div class="kpi-card">
-                        <div class="kpi-top"><span class="ki" aria-label="Total Unit Tasks">🔢</span><span class="kl">Total Unit Tasks</span></div>
+                        <div class="kpi-icon-box kpi-icon-box--tasks">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
+                            </svg>
+                        </div>
+                        <div class="kpi-top"><span class="kl">Total Unit Tasks</span></div>
                         <div class="kv" id="kpi-tasks">—</div>
                         <div class="ks" id="kpi-tasks-sub">Sum of remaining qty</div>
                     </div>
                     <div class="kpi-card">
-                        <div class="kpi-top"><span class="ki" aria-label="Total Op. Hours">⏱</span><span class="kl">Total Op. Hours</span></div>
+                        <div class="kpi-icon-box kpi-icon-box--hours">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+                            </svg>
+                        </div>
+                        <div class="kpi-top"><span class="kl">Total Op. Hours</span></div>
                         <div class="kv" id="kpi-hours">—</div>
                         <div class="ks" id="kpi-hours-sub">Σ op_hrs × qty</div>
                     </div>
                     <div class="kpi-card">
-                        <div class="kpi-top"><span class="ki" aria-label="Working Days">📅</span><span class="kl">Working Days</span></div>
+                        <div class="kpi-icon-box kpi-icon-box--days">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+                            </svg>
+                        </div>
+                        <div class="kpi-top"><span class="kl">Working Days</span></div>
                         <div class="kv" id="kpi-days">—</div>
                         <div class="ks" id="kpi-days-sub">Bottleneck completion</div>
                     </div>
                     <div class="kpi-card kpi-accent">
-                        <div class="kpi-top"><span class="ki" aria-label="Projected End Date">🏁</span><span class="kl">Projected End Date</span></div>
+                        <div class="kpi-icon-box kpi-icon-box--end">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/>
+                            </svg>
+                        </div>
+                        <div class="kpi-top"><span class="kl">Projected End Date</span></div>
                         <div class="kv" id="kpi-end-date">—</div>
                         <div class="ks" id="kpi-end-sub">Based on settings</div>
                     </div>
@@ -570,7 +697,9 @@
                     <button class="panel-collapse-btn" aria-label="Collapse panel" title="Collapse/Expand">
                         <svg class="collapse-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
                     </button>
-                    <span class="panel-icon">☰</span>
+                    <span class="panel-icon">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+                    </span>
                     <h2>Master Parts Data</h2>
                     <span class="panel-count" id="parts-table-count"></span>
                 </div>
@@ -606,7 +735,9 @@
             </div>
             <div id="parts-table-wrap" class="scroll-wrap panel-body-flush">
                 <div class="empty-state">
-                    <div class="es-icon">📋</div>
+                    <div class="es-icon">
+                        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><line x1="9" y1="12" x2="15" y2="12"/><line x1="9" y1="16" x2="15" y2="16"/></svg>
+                    </div>
                     <p class="es-title">No parts data yet</p>
                     <p>Upload an Excel file or add parts manually to begin.</p>
                     <div class="es-actions">
@@ -623,7 +754,9 @@
                     <button class="panel-collapse-btn" aria-label="Collapse panel" title="Collapse/Expand">
                         <svg class="collapse-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
                     </button>
-                    <span class="panel-icon">▥</span>
+                    <span class="panel-icon">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18M15 3v18"/></svg>
+                    </span>
                     <h2>Production Schedule</h2>
                     <span class="panel-count" id="gantt-task-count"></span>
                 </div>
@@ -679,19 +812,31 @@
                         <option value="K10">K10</option>
                         <option value="K11">K11</option>
                     </select>
-                    <button class="btn btn-sm btn-ghost" id="gantt-today-btn" title="Jump to today">⬡ Today</button>
+                    <button class="btn btn-sm btn-ghost" id="gantt-today-btn" title="Jump to today">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                        Today
+                    </button>
                     <div class="gantt-legend">
                         <span class="gl-dot k9"></span><span class="gl-lbl">K9</span>
                         <span class="gl-dot k10"></span><span class="gl-lbl">K10</span>
                         <span class="gl-dot k11"></span><span class="gl-lbl">K11</span>
                     </div>
-                    <button class="btn btn-outline btn-sm" id="export-report-btn">📊 Export</button>
+                    <button class="btn btn-outline btn-sm" id="export-report-btn">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                        Export
+                    </button>
+                    <button class="btn btn-outline btn-sm" id="build-seq-btn">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+                        Build Sequence
+                    </button>
                 </div>
             </div>
             <div class="panel-body-flush gantt-body">
                 <div id="gantt-container" class="gantt-container">
                     <div class="gantt-empty">
-                        <div class="ge-ico">▥</div>
+                        <div class="ge-ico">
+                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18M15 3v18"/></svg>
+                    </div>
                         <p class="ge-title">No Production Schedule</p>
                         <p class="ge-sub">Add machines, configure shifts, and upload parts data</p>
                         <div class="ge-actions">
@@ -708,8 +853,81 @@
     <!-- Gantt rich tooltip -->
     <div id="gantt-tooltip" class="gantt-tooltip hidden"></div>
 
-    <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
-    <script type="module" src="app.js?v=18"></script>
+    <!-- BUILD SEQUENCE MODAL -->
+    <div id="seq-modal" class="modal-backdrop hidden">
+        <div class="modal modal-xl">
+            <div class="modal-hdr">
+                <span class="modal-tag">PRODUCTION SEQUENCE</span>
+                <h3>Build Sequence</h3>
+                <button id="seq-modal-close" class="modal-x">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p class="seq-intro">
+                    Define the exact order of part production with quantities and vehicles.
+                    Each row is one job unit. The scheduler follows this sequence strictly.
+                    Leave empty to use automatic per-part expansion.
+                </p>
+
+                <!-- Add row form -->
+                <div class="seq-add-form">
+                    <div class="seq-add-row">
+                        <div class="seq-field">
+                            <label>Part</label>
+                            <select id="seq-add-part">
+                                <option value="">— select part —</option>
+                            </select>
+                        </div>
+                        <div class="seq-field">
+                            <label>Vehicle</label>
+                            <select id="seq-add-vehicle">
+                                <option value="">Auto</option>
+                                <option value="K9">K9</option>
+                                <option value="K10">K10</option>
+                                <option value="K11">K11</option>
+                            </select>
+                        </div>
+                        <div class="seq-field">
+                            <label>Qty</label>
+                            <input type="number" id="seq-add-qty" min="1" step="1" placeholder="1" />
+                        </div>
+                        <button class="btn btn-amber btn-sm" id="seq-add-btn" style="align-self:flex-end">+ Add Row</button>
+                    </div>
+                    <div class="seq-add-actions">
+                        <button class="btn btn-ghost btn-sm" id="seq-clear-btn">Clear All</button>
+                    </div>
+                </div>
+
+                <!-- Sequence table -->
+                <div class="seq-table-wrap">
+                    <table class="seq-table" id="seq-table">
+                        <thead>
+                            <tr>
+                                <th class="seq-col-seq">#</th>
+                                <th class="seq-col-part">Part</th>
+                                <th class="seq-col-veh">Vehicle</th>
+                                <th class="seq-col-qty">Qty</th>
+                                <th class="seq-col-op">Op Hrs</th>
+                                <th class="seq-col-del"></th>
+                            </tr>
+                        </thead>
+                        <tbody id="seq-tbody"></tbody>
+                    </table>
+                    <p class="seq-empty" id="seq-empty-msg">No sequence defined. Add rows above or close to use automatic expansion.</p>
+                </div>
+
+                <div class="seq-summary" id="seq-summary"></div>
+            </div>
+            <div class="modal-ftr">
+                <button class="btn btn-ghost" id="seq-cancel-btn">Cancel</button>
+                <button class="btn btn-amber" id="seq-apply-btn">✓ Apply Sequence</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.5.25/dist/jspdf.plugin.autotable.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.min.js"></script>
+    <script type="module" src="app.js?v=19"></script>
 </body>
 
 </html>

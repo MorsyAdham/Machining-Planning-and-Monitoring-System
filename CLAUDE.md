@@ -4,11 +4,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-A single-page machining production planning dashboard for military vehicle manufacturing (K9, K10, K11 battalions). It schedules parts machining across machines with multi-shift support, generates Gantt charts, and exports reports to Excel.
+A single-page machining production planning dashboard for military vehicle manufacturing (K9, K10, K11 battalions). It schedules parts machining across machines with multi-shift support, generates Gantt charts, and exports reports to Excel and PDF.
 
 - **Type**: Static SPA (no build step)
 - **Backend**: Supabase (Postgres) — credentials embedded in `app.js`
-- **Stack**: Vanilla JS + CSS, ES modules, SheetJS for Excel export
+- **Stack**: Vanilla JS + CSS, ES modules, SheetJS for Excel export, jsPDF for PDF export
 
 ## Run Locally
 
@@ -30,19 +30,28 @@ Open `http://localhost:8000`. The app requires a Supabase connection to function
 
 ### State Flow
 ```
-init() → loadSettings() → loadShifts() → loadMachines() → loadAllPartsAndRebuild()
-                                                                         ↓
+init() → loadSettings() → loadShifts() → loadProdSequence() → loadMachines() → loadAllPartsAndRebuild()
+                                                                                         ↓
                                                               scheduleParts() → rebuildPlan()
-                                                                         ↓
+                                                                                         ↓
                                                      renderDashboard() + renderGanttFiltered()
 ```
 
 ### Scheduling Engine (Section 8)
 - Works on **integer working-day slots** (fractional days for sub-day tasks)
 - `barDays = opHrs / machineDailyHours` — allows multiple short tasks to stack in one calendar day
+- **Day-fit check**: if a task doesn't fully fit in remaining hours of the current calendar day, it snaps to the next day's start (no partial-day straddling)
 - `expandPart()` (Section 7) expands each part row into per-unit tasks using vehicle distribution priority: `unit_overrides > k9/k10/k11_qty > auto flags (O)`
+- **Build Sequence** (Section 8b): when `prodSequence` is defined, the scheduler cycles a user-defined repeating pattern until all master-data totals are exhausted, then appends non-pattern parts
 - Tasks are assigned to the **least-loaded machine** of matching type
 - Pinned dates are honored but never cause overlap — tasks queue behind existing work
+
+### Build Sequence (Section 8b)
+- `prodSequence` global array: `[{partId, vehicle, qty}]` stored in `building1_settings.production_sequence`
+- Defines a **repeating production pattern** (recipe), not a one-time list
+- The scheduler cycles the pattern until every part's master-data total is satisfied
+- Parts not in the sequence are scheduled after using `expandPart()`
+- UI: "Build Sequence" button in Gantt toolbar opens a modal to manage the pattern
 
 ### Week / Working Day Rules
 - **Week: Saturday → Friday** (configured via `isWorkingDay()`)
@@ -58,17 +67,34 @@ const BATTALION = { K9: 18, K10: 3, K11: 4 };  // total 25
 ### Key Sections in `app.js`
 | Section | Purpose |
 |---------|---------|
-| 1 · Config | Constants: Supabase URL/keys, battalion sizes, VMETA (vehicle priorities), FALLBACK_SHIFTS |
+| 1 · Config | Constants: Supabase URL/keys, battalion sizes, VMETA, FALLBACK_SHIFTS |
 | 5 · Machine Capacity | `mDailyForMachine()` — sums shift durations, applies capacity % |
-| 6 · Vehicle Assignment | `autoVehicleForUnit()` — battalion slot allocation |
+| 6 · Vehicle Auto-Assign | `autoVehicleForUnit()` — battalion slot allocation |
 | 7 · Expand Part | `expandPart()` — part → unit tasks with priority cascade |
-| 8 · Scheduling | `scheduleParts()` — core scheduling algorithm |
-| 12 · Machine Modal | Add/edit machines with active shift checkboxes |
+| 8 · Scheduling | `scheduleParts()` — core scheduling algorithm with day-fit check |
+| 8b · Build Sequence | `showSeqModal()`, `renderSeqTable()`, `applySeqAndClose()`, `loadProdSequence()` |
+| 10 · Shifts | `loadShifts()`, shift CRUD |
+| 11 · Machine CRUD | `loadMachines()`, machine modal |
+| 12 · Machines Table | `renderMachinesTable()` |
+| 14 · File Upload | `uploadFile()`, XLSX/CSV parsing |
+| 15 · Load & Rebuild | `loadAllPartsAndRebuild()` |
+| 16 · Dashboard | `renderDashboard()` — KPI cards |
+| 17 · Parts Table | `renderPartsTable()`, `getFilteredParts()` |
 | 18 · Part Modal | Per-unit vehicle, shift, and pinned-date overrides |
-| 20 · Gantt | Three views: Machine, Part (default), Weekly |
+| 19 · Unit Schedule | `refreshUnitSchedule()` — per-unit form in part modal |
+| 20 · Gantt | `renderGanttFiltered()`, `renderMachineView()`, `renderPartView()`, `renderWeeklyView()` |
+| 21 · Exports | XLSX and PDF exports for all report types |
+| 22 · Navbar Dropdowns | Settings, Shifts, Data panels |
+| 23 · UI Helpers | `showToast()`, `esc()`, `escAttr()`, `flt()` |
+| 24 · Theme | Dark/light toggle via `data-theme` on `<html>` |
+| 25 · Event Listeners | `attachListeners()` |
+
+### Gantt Tooltips
+- `attachTooltips(container)` — attaches mouseenter/mousemove/mouseleave to `.tb`, `.unit-tick`, `.wk-cell-wrap`
+- **Important**: `data-tip` attribute values use `escAttr()` (not `esc()`) — `esc()` escapes `<` and `>` which breaks HTML parsing in attribute context; `escAttr()` only escapes `&`, `"`, `'` leaving `<>` intact
 
 ### Supabase Tables
-- `building1_settings` — Plan start date, day start/end, saturday_working, time_unit
+- `building1_settings` — Plan start date, day start/end, saturday_working, time_unit, **production_sequence (jsonb)**
 - `building1_machines` — Name, type, active_shifts (jsonb), capacity_percent, is_active
 - `building1_shifts` — Shift number, name, start/end time, active_days (jsonb)
 - `building1_parts` — Part data with k9/k10/k11 flags, qty, location, unit_overrides (jsonb)
@@ -80,6 +106,7 @@ const BATTALION = { K9: 18, K10: 3, K11: 4 };  // total 25
 - DOM ids: descriptive, hyphenated (e.g. `part-modal-save`, `gantt-filter-machine`)
 - CSS class names matching BEM-like patterns (e.g. `.btn-tbl`, `.gantt-container`)
 - Preserve numbered section blocks in `app.js` and token-driven structure in `styles.css`
+- Use `escAttr()` for HTML attribute string values; use `esc()` for HTML text content
 
 ## Security Note
 Supabase credentials are embedded in `app.js`. Do not replace credentials, rename tables, or alter persistence behavior without confirming downstream impact.

@@ -2,7 +2,13 @@
   "permissions": {
     "allow": [
       "Skill(browser-use)",
-      "mcp__ide__getDiagnostics"
+      "mcp__ide__getDiagnostics",
+      "Bash(python:*)",
+      "Bash(node --check app.js)",
+      "WebFetch(domain:cdnjs.cloudflare.com)",
+      "WebSearch",
+      "WebFetch(domain:docs.sheetjs.com)",
+      "WebFetch(domain:cdn.jsdelivr.net)"
     ]
   }
 }

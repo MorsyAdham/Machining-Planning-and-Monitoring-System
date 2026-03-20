@@ -44,6 +44,7 @@ let selectedFile = null;
 let currentEditPart = null;
 let ptSearch = '', ptLoc = '', ptStatus = '', ptVeh = '';
 let gSearch = '', gMach = '', gVeh = '';
+let prodSequence = [];   // [{partId, partNumber, partName, vehicle, qty}] — user-defined build order
 
 /* ═══════════════════════════════════════════════════════════════
    3 · UTILITIES
@@ -54,6 +55,11 @@ function esc(s) {
     return String(s == null ? '' : s)
         .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+// For data attribute values — only escape quotes, keep < > so browser parses as HTML
+function escAttr(s) {
+    return String(s == null ? '' : s)
+        .replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 function flt(v) { return parseFloat(String(v ?? '').replace(/,/g, '')) || 0; }
 function pad(n, w) { return String(n).padStart(w || 3, '0'); }
@@ -266,15 +272,74 @@ function scheduleParts(parts, machines) {
     });
 
     let raw = [];
-    parts.forEach(p => { raw = raw.concat(expandPart(p)); });
 
-    // Sort: sort_order (primary) → shiftPref (null last) → vehicle priority
-    raw.sort((a, b) => {
-        if (a.sortOrder !== b.sortOrder) return a.sortOrder - b.sortOrder;
-        const sa = a.shiftPref != null ? a.shiftPref : 99, sb = b.shiftPref != null ? b.shiftPref : 99;
-        if (sa !== sb) return sa - sb;
-        return (VMETA[a.vehicle]?.priority ?? 99) - (VMETA[b.vehicle]?.priority ?? 99);
-    });
+    // ── Use explicit build sequence if defined ──
+    // prodSequence: [{partId, vehicle, qty}] — a REPEATING PATTERN (recipe)
+    // The pattern cycles until all master-data totals are exhausted.
+    // Entries with 0 remaining are skipped. Parts not in the pattern are appended after.
+    if (prodSequence && prodSequence.length > 0) {
+        // Count total units needed per partId (from master data via expandPart)
+        const partCounts = {};
+        parts.forEach(p => {
+            const tasks = expandPart(p);
+            partCounts[p.id] = tasks.length;
+        });
+
+        // Separate pattern parts from non-pattern parts
+        const seqPartIds = new Set(prodSequence.map(e => String(e.partId)));
+        const nonPatternParts = parts.filter(p => !seqPartIds.has(String(p.id)));
+
+        const unitCounters = { ...partCounts }; // {partId: remaining}
+        let seqIdx = 0;
+
+        // Keep cycling until every counter is 0
+        while (Object.values(unitCounters).some(v => v > 0)) {
+            let madeProgress = false;
+
+            for (let i = 0; i < prodSequence.length; i++) {
+                const entry = prodSequence[i];
+                const part = parts.find(p => String(p.id) === String(entry.partId));
+                if (!part) continue;
+                if ((unitCounters[part.id] || 0) <= 0) continue; // exhausted → skip
+
+                madeProgress = true;
+                const vehicle = entry.vehicle || 'K9';
+                const globalUnitIdx = (partCounts[part.id] || 0) - (unitCounters[part.id] || 0) + 1;
+                raw.push({
+                    partId: part.id,
+                    partNumber: String(part.part_number || '').trim(),
+                    partName: String(part.part_name || '').trim(),
+                    opHrs: flt(part.op_hrs),
+                    machineType: String(part.location || 'Unknown').trim(),
+                    sortOrder: 0,
+                    vehicle,
+                    unitIndex: globalUnitIdx,
+                    shiftPref: part.shift_preference ? parseInt(part.shift_preference, 10) : null,
+                    pinnedDate: null,
+                });
+                unitCounters[part.id]--;
+            }
+
+            // If no progress was made but some counters are still > 0, break to avoid infinite loop
+            if (!madeProgress) break;
+        }
+
+        // Append non-pattern parts in original sort order (no sequence repetition)
+        nonPatternParts.forEach(p => {
+            const tasks = expandPart(p);
+            raw = raw.concat(tasks);
+        });
+    } else {
+        // Fallback: auto-expand all parts (no explicit sequence)
+        parts.forEach(p => { raw = raw.concat(expandPart(p)); });
+        // Sort: sort_order (primary) → shiftPref (null last) → vehicle priority
+        raw.sort((a, b) => {
+            if (a.sortOrder !== b.sortOrder) return a.sortOrder - b.sortOrder;
+            const sa = a.shiftPref != null ? a.shiftPref : 99, sb = b.shiftPref != null ? b.shiftPref : 99;
+            if (sa !== sb) return sa - sb;
+            return (VMETA[a.vehicle]?.priority ?? 99) - (VMETA[b.vehicle]?.priority ?? 99);
+        });
+    }
 
     // Machine state: integer working-day index (0 = first working day)
     const avail = {};
@@ -306,9 +371,17 @@ function scheduleParts(parts, machines) {
         // - Pinned:  honour the requested date, BUT if the machine is already
         //   busy past that date, queue behind it (no overlap).
         // - Free:    start when machine next becomes available.
-        const startDay = (pinnedDay !== null)
-            ? Math.max(pinnedDay, avail[chosen.id])  // pinned but never overlaps
+        let startDay = (pinnedDay !== null)
+            ? Math.max(pinnedDay, avail[chosen.id])
             : avail[chosen.id];
+
+        // Ensure task fully fits within the same calendar day.
+        // Calculate remaining hours in the current day at startDay; if not enough, defer to next day.
+        const dayEnd = Math.ceil(startDay);
+        const remHrs = (dayEnd - startDay) * daily;
+        if (task.opHrs > remHrs && remHrs >= 0) {
+            startDay = dayEnd; // snap to next day boundary
+        }
 
         const endDay = startDay + barDays;   // fractional — accurate calendar end
 
@@ -333,6 +406,160 @@ function scheduleParts(parts, machines) {
         : 0;
 
     return { tasks: scheduled, machineLoad: avail, totalWorkDays };
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   8b · BUILD SEQUENCE
+   Lets users define an explicit production order:
+   [{partId, vehicle, qty}, …] stored in building1_settings.
+   When defined, the scheduler processes entries in this exact order
+   instead of auto-expanding parts.
+═══════════════════════════════════════════════════════════════ */
+function showSeqModal() {
+    // Populate part dropdown — set background/color inline so browser dropdown respects dark theme
+    const isDark = document.documentElement.getAttribute('data-theme') !== 'light';
+    const selBg = isDark ? '#1c2230' : '#fdfbf7';
+    const selFg = isDark ? '#edf2f7' : '#1c1810';
+
+    const partSel = $('seq-add-part');
+    partSel.style.background = selBg;
+    partSel.style.color = selFg;
+    partSel.innerHTML = '<option value="">— select part —</option>';
+    (currentParts || []).forEach(p => {
+        const opt = document.createElement('option');
+        opt.value = String(p.id || '');
+        opt.textContent = `${p.part_number || ''} — ${p.part_name || ''}`;
+        partSel.appendChild(opt);
+    });
+
+    const vehSel = $('seq-add-vehicle');
+    vehSel.style.background = selBg;
+    vehSel.style.color = selFg;
+    $('seq-modal')?.classList.remove('hidden');
+}
+
+function hideSeqModal() {
+    $('seq-modal')?.classList.add('hidden');
+}
+
+function renderSeqTable() {
+    const tbody = $('seq-tbody');
+    const emptyMsg = $('seq-empty-msg');
+    const summary = $('seq-summary');
+    if (!tbody) return;
+
+    tbody.innerHTML = '';
+    const seq = prodSequence;
+
+    if (!seq.length) {
+        emptyMsg?.classList.remove('hidden');
+        if (summary) summary.textContent = '';
+        return;
+    }
+    emptyMsg?.classList.add('hidden');
+
+    let totalHrs = 0;
+    seq.forEach((entry, i) => {
+        const opHrs = flt(entry.opHrs || 0);
+        totalHrs += opHrs * entry.qty;
+        const tr = document.createElement('tr');
+
+        // Part lookup for display
+        const part = (currentParts || []).find(p => String(p.id) === String(entry.partId));
+        const partLabel = part
+            ? `${part.part_number || ''} — ${part.part_name || ''}`
+            : (entry.partNumber || entry.partId || '?');
+
+        tr.innerHTML = `
+            <td class="seq-num">${i + 1}</td>
+            <td>${esc(partLabel)}</td>
+            <td><span class="vt ${(entry.vehicle || '').toLowerCase()}">${entry.vehicle || 'Auto'}</span></td>
+            <td style="text-align:right">${entry.qty}</td>
+            <td style="text-align:right">${opHrs.toFixed(2)}</td>
+            <td>
+                <button class="seq-del-btn" data-idx="${i}" title="Remove row">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
+            </td>
+        `;
+        tbody.appendChild(tr);
+    });
+
+    if (summary) {
+        summary.textContent = `${seq.length} rows · ${totalHrs.toFixed(1)} total op. hours`;
+    }
+}
+
+function addSeqRow() {
+    const partSel = $('seq-add-part');
+    const vehSel = $('seq-add-vehicle');
+    const qtyInput = $('seq-add-qty');
+    if (!partSel || !vehSel || !qtyInput) return;
+
+    const partId = partSel.value;
+    const vehicle = vehSel.value || null;
+    const qty = Math.max(1, parseInt(qtyInput.value, 10) || 1);
+
+    if (!partId) {
+        showToast('Please select a part first', 'error');
+        return;
+    }
+
+    const part = (currentParts || []).find(p => String(p.id) === String(partId));
+    if (!part) return;
+
+    prodSequence.push({
+        partId,
+        partNumber: part.part_number || '',
+        partName: part.part_name || '',
+        vehicle,
+        qty,
+        opHrs: flt(part.op_hrs),
+    });
+
+    qtyInput.value = '';
+    vehSel.value = '';
+    partSel.value = '';
+    renderSeqTable();
+}
+
+function removeSeqRow(idx) {
+    prodSequence.splice(idx, 1);
+    renderSeqTable();
+}
+
+function clearSeq() {
+    if (!confirm('Clear the entire build sequence?')) return;
+    prodSequence = [];
+    renderSeqTable();
+}
+
+async function applySeqAndClose() {
+    try {
+        await db.from('building1_settings').upsert({
+            id: activeBuildingId,
+            production_sequence: prodSequence,
+        }, { onConflict: 'id' });
+        showToast('Build sequence applied ✓', 'success');
+    } catch (e) {
+        // Fallback: save locally
+        appSettings.production_sequence = prodSequence;
+        showToast('Applied locally (save settings to persist)', 'info');
+    }
+    hideSeqModal();
+    rebuildPlan();
+}
+
+async function loadProdSequence() {
+    try {
+        const { data } = await db.from('building1_settings')
+            .select('production_sequence')
+            .eq('id', activeBuildingId)
+            .single();
+        prodSequence = Array.isArray(data?.production_sequence) ? data.production_sequence : [];
+    } catch {
+        prodSequence = [];
+    }
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -1330,12 +1557,15 @@ function tooltipHTML(t) {
   </div>`;
 }
 
-// Attach tooltip listeners to all .tb elements in a container
+// Attach tooltip listeners to all .tb and .unit-tick elements in a container
 function attachTooltips(container) {
     const tt = $('gantt-tooltip'); if (!tt) return;
-    container.querySelectorAll('.tb[data-tip]').forEach(bar => {
+    const bars = container.querySelectorAll('.tb[data-tip], .unit-tick[data-tip], .wk-cell-wrap[data-tip]');
+    console.log('[debug] attachTooltips: found', bars.length, 'elements with data-tip');
+    bars.forEach(bar => {
         bar.addEventListener('mouseenter', e => {
-            tt.innerHTML = bar.dataset.tip;
+            console.log('[debug] hover on', bar.className, '→ tip:', bar.dataset.tip ? bar.dataset.tip.slice(0, 60) : 'EMPTY');
+            tt.innerHTML = bar.dataset.tip || '';
             tt.classList.remove('hidden');
             positionTooltip(e, tt);
         });
@@ -1442,7 +1672,7 @@ function renderMachineView(tasks, c) {
                 const label = barW > 32 ? t.partNumber : '';
                 return `<div class="tb tb-${vm.cls}${t.pinnedDate ? ' tb-pinned' : ''}"
           style="left:${barL.toFixed(1)}px;width:${barW.toFixed(1)}px;top:8px;bottom:8px;"
-          data-tip="${esc(tooltipHTML(t))}">
+          data-tip="${escAttr(tooltipHTML(t))}">
           <span class="tb-lbl">${label}</span>
         </div>`;
             }).join('');
@@ -1568,16 +1798,16 @@ function renderPartView(tasks, c) {
         ${tl}
         <!-- Span bar with vehicle segments -->
         <div class="part-span-bar" style="left:${spanL.toFixed(1)}px;width:${spanW.toFixed(1)}px;"
-          data-tip="${esc(tipHTML)}">
+          data-tip="${escAttr(tipHTML)}">
           ${segs}
-          <span class="part-span-label">${spanW > 80 ? pn : ''}</span>
+          <span class="part-span-label">${spanW > 80 ? esc(pn) : ''}</span>
         </div>
         <!-- Individual unit tick marks for detail -->
         ${pTasks.map(t => {
             const tL = t.startDay * DW;
             const vm = VMETA[t.vehicle] || { cls: 'k9' };
             return `<div class="unit-tick unit-tick-${vm.cls}" style="left:${tL.toFixed(1)}px;"
-            data-tip="${esc(tooltipHTML(t))}"></div>`;
+            data-tip="${escAttr(tooltipHTML(t))}"></div>`;
         }).join('')}
       </div>
     </div>`;
@@ -1662,7 +1892,7 @@ function renderWeeklyView(tasks, c) {
           ${bk.hrs.K11 > 0 ? `<div class="gt-row"><span class="gt-row-label" style="color:var(--k11c)">K11</span><span class="gt-row-value">${bk.hrs.K11.toFixed(1)} h</span></div>` : ''}
           <div class="gt-row"><span class="gt-row-label">Total</span><span class="gt-row-value">${totalH.toFixed(1)} h · ${bk.count} units</span></div>
         </div></div>`;
-            return `<div class="wk-cell-wrap" style="left:${wi * WW + 3}px;width:${WW - 6}px;" data-tip="${esc(tipHTML)}">
+            return `<div class="wk-cell-wrap" style="left:${wi * WW + 3}px;width:${WW - 6}px;" data-tip="${escAttr(tipHTML)}">
         <div class="wk-veh-bar">
           ${k9pct > 0 ? `<div class="wk-seg wk-k9"  style="width:${k9pct.toFixed(1)}%"></div>` : ''}
           ${k10pct > 0 ? `<div class="wk-seg wk-k10" style="width:${k10pct.toFixed(1)}%"></div>` : ''}
@@ -1726,71 +1956,721 @@ function _ganttWrap(LW, totW, dates, DW, title, sub, rowsHTML) {
 
 /* ═══════════════════════════════════════════════════════════════
    21 · EXPORT REPORTS
+   Uses SheetJS (XLSX) for Excel and jsPDF for PDF reports.
+   All exports use a light theme optimized for printing.
 ═══════════════════════════════════════════════════════════════ */
-
-// Color constants for Excel exports (vehicle-coded)
-const XLSX_COLORS = {
-    // Header
-    HDR_BG: 'FF151921',   // dark background
-    HDR_FG: 'FFFFFFFF',   // white text
-    HDR_ACCENT: 'FFF59E0B', // amber accent
-    // Vehicle fills
-    K9_BG: 'FF064E3B',   K9_FG: 'FF34D399',
-    K10_BG: 'FF7C2D12',  K10_FG: 'FFFB923C',
-    K11_BG: 'FF4C1D95',  K11_FG: 'FFA78BFA',
-    // Status
-    OK: 'FF4ADE80', ERR: 'FFF87171', WARN: 'FFFBBF24',
-    // Borders
-    BORDER: 'FF232B3E',
-    // Alternating row
-    ROW_ALT: 'FF1C2230',
-    ROW_BASE: 'FF0F1117',
-};
-
-// Build a styled header row from column definitions
-// cols: [{title, width, align?}]
-function _mkHdrRow(cols) {
-    return cols.map(c => ({ v: c.title, t: 's', s: {
-        font: { bold: true, color: { rgb: XLSX_COLORS.HDR_FG } },
-        fill: { fgColor: { rgb: XLSX_COLORS.HDR_BG } },
-        alignment: { horizontal: c.align || 'left', vertical: 'center' },
-        border: {
-            top: { style: 'thin', color: { rgb: XLSX_COLORS.HDR_ACCENT } },
-            bottom: { style: 'thin', color: { rgb: XLSX_COLORS.HDR_ACCENT } },
-            left: { style: 'thin', color: { rgb: XLSX_COLORS.BORDER } },
-            right: { style: 'thin', color: { rgb: XLSX_COLORS.BORDER } },
-        }
-    }}));
-}
-
-// Build a data row with optional vehicle color
-function _mkRow(cells, opts) {
-    opts = opts || {};
-    const isK9 = opts.vehicle === 'K9', isK10 = opts.vehicle === 'K10', isK11 = opts.vehicle === 'K11';
-    let bg, fg;
-    if (isK9)      { bg = XLSX_COLORS.K9_BG;   fg = XLSX_COLORS.K9_FG; }
-    else if (isK10){ bg = XLSX_COLORS.K10_BG;  fg = XLSX_COLORS.K10_FG; }
-    else if (isK11){ bg = XLSX_COLORS.K11_BG;  fg = XLSX_COLORS.K11_FG; }
-    else            { bg = opts.bg || XLSX_COLORS.ROW_BASE; fg = 'FFEDf2f7'; }
-
-    return cells.map((val, i) => ({ v: val, t: typeof val === 'number' ? 'n' : 's', s: {
-        font: { color: { rgb: fg }, bold: opts.bold || false },
-        fill: { fgColor: { rgb: bg } },
-        alignment: { vertical: 'center' },
-        border: {
-            top: { style: 'thin', color: { rgb: XLSX_COLORS.BORDER } },
-            bottom: { style: 'thin', color: { rgb: XLSX_COLORS.BORDER } },
-            left: { style: 'thin', color: { rgb: XLSX_COLORS.BORDER } },
-            right: { style: 'thin', color: { rgb: XLSX_COLORS.BORDER } },
-        }
-    }}));
-}
 
 function showReportsModal() {
     $('reports-modal')?.classList.remove('hidden');
 }
 
-/* ── Parts List ──────────────────────────────────────── */
+// Light theme color palette for exports (print-friendly)
+const RPT = {
+    BG:       'FFFFFFFF',  // page bg (white)
+    HEADER:   'FFD0D7DA',  // header row bg (light gray)
+    HEADER_FG:'FF242424',  // header text (dark)
+    ACCENT:   'FF1A3A5C',  // dark navy accent
+    ACCENT2:  'FF1A5C4A',  // dark teal accent
+    BORDER:   'FF9CA3AF',  // cell borders (medium gray)
+    ROW_A:    'FFF9FAFB',  // alternating row A (near white)
+    ROW_B:    'FFFFFFFF',  // alternating row B (white)
+    K9_BG:    'FFDCFCE7',  K9_FG:  'FF166534',  K9_HEX: '#166534',
+    K10_BG:   'FFFEF3C7',  K10_FG: 'FF92400E',  K10_HEX:'#92400E',
+    K11_BG:   'FFEDE9FE',  K11_FG: 'FF6B21A8',  K11_HEX:'#6B21A8',
+    TEXT:     'FF242424',  // primary text (dark)
+    TEXT2:    'FF6B7280',  // secondary text (medium gray)
+    WARN:     'FFB45309',  // warning orange
+    ERR:      'FFDC2626',  // error red
+    OK:       'FF16A34A',  // ok green
+    AMBER:    'FFD97706',  // amber
+    TEAL:     'FF0D9488',  // teal
+};
+
+// Helper: styled header row
+function _rh(cols) {
+    return cols.map(c => ({
+        v: c.title || '', t: 's', s: {
+            font: { bold: true, color: { rgb: RPT.HEADER_FG }, sz: 11, name: 'Calibri' },
+            fill: { fgColor: { rgb: RPT.HEADER } },
+            alignment: { horizontal: c.align || 'left', vertical: 'center' },
+            border: {
+                top:    { style: 'thin', color: { rgb: RPT.ACCENT } },
+                bottom: { style: 'thin', color: { rgb: RPT.ACCENT } },
+                left:   { style: 'thin', color: { rgb: RPT.BORDER } },
+                right:  { style: 'thin', color: { rgb: RPT.BORDER } },
+            }
+        }
+    }));
+}
+
+// Helper: data row with optional vehicle color + alternating bg
+function _dr(cells, opts) {
+    opts = opts || {};
+    const v = opts.vehicle;
+    let bg, fg;
+    if      (v === 'K9')  { bg = RPT.K9_BG;  fg = RPT.K9_FG; }
+    else if (v === 'K10') { bg = RPT.K10_BG; fg = RPT.K10_FG; }
+    else if (v === 'K11') { bg = RPT.K11_BG; fg = RPT.K11_FG; }
+    else                  { bg = opts.bg || (opts.alt ? RPT.ROW_B : RPT.ROW_A); fg = RPT.TEXT; }
+
+    return cells.map((val, i) => ({
+        v: val != null ? val : '', t: typeof val === 'number' ? 'n' : 's', s: {
+            font: { color: { rgb: fg }, bold: opts.bold || false, sz: 10, name: 'Calibri' },
+            fill: { fgColor: { rgb: bg } },
+            alignment: { vertical: 'center' },
+            border: {
+                top:    { style: 'thin', color: { rgb: RPT.BORDER } },
+                bottom: { style: 'thin', color: { rgb: RPT.BORDER } },
+                left:   { style: 'thin', color: { rgb: RPT.BORDER } },
+                right:  { style: 'thin', color: { rgb: RPT.BORDER } },
+            }
+        }
+    }));
+}
+
+// Helper: group header row spanning all cols
+function _grh(label, numCols) {
+    const EMPTY_CELL = { v: '', t: 's', s: {
+        fill: { fgColor: { rgb: RPT.BG } },
+        border: {
+            top:    { style: 'medium', color: { rgb: RPT.ACCENT } },
+            bottom: { style: 'medium', color: { rgb: RPT.ACCENT } },
+            left:   { style: 'thin', color: { rgb: RPT.BORDER } },
+            right:  { style: 'thin', color: { rgb: RPT.BORDER } },
+        }
+    }};
+    return [{
+        v: label, t: 's', s: {
+            font: { bold: true, color: { rgb: RPT.ACCENT }, sz: 11, name: 'Calibri' },
+            fill: { fgColor: { rgb: RPT.BG } },
+            alignment: { horizontal: 'left', vertical: 'center' },
+            border: {
+                top:    { style: 'medium', color: { rgb: RPT.ACCENT } },
+                bottom: { style: 'medium', color: { rgb: RPT.ACCENT } },
+                left:   { style: 'medium', color: { rgb: RPT.ACCENT } },
+                right:  { style: 'medium', color: { rgb: RPT.ACCENT } },
+            }
+        }
+    }].concat(new Array((numCols || 16) - 1).fill(EMPTY_CELL));
+}
+
+// Helper: build a worksheet with column widths and row heights, auto-filter
+function _buildWs(sheetData, colWidths, rowHeights) {
+    const ws = XLSX.utils.aoa_to_sheet(sheetData);
+    ws['!cols'] = colWidths.map(w => ({ wch: w }));
+    if (rowHeights) ws['!rows'] = rowHeights;
+    return ws;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   21 · EXPORTS (XLSX + PDF)
+═══════════════════════════════════════════════════════════════ */
+
+// ── PARTS LIST PDF ───────────────────────────────────────
+function exportPartsPDF() {
+    const { jsPDF } = window.jspdf; if (!jsPDF) { showToast('jsPDF not ready', 'error'); return; }
+    const isMin = (appSettings.time_unit || 'h') === 'min';
+    const unitCol = isMin ? 'Op Min/Unit' : 'Op Hrs/Unit';
+    const totCol  = isMin ? 'Total Op Min'  : 'Total Op Hrs';
+
+    const doc = _makePdfDoc(`Building #${activeBuildingId} — Parts List`);
+
+    const cols = ['Part Number', 'Part Name', 'Location', 'K9', 'K10', 'K11', 'Rem. QTY', unitCol, totCol, 'Status', 'Target Date'];
+    const rows = [];
+    (currentParts || allParts || []).forEach(p => {
+        rows.push([
+            p.part_number || '', p.part_name || '', p.location || '',
+            p.k9 ? '●' : '', p.k10 ? '●' : '', p.k11 ? '●' : '',
+            String(flt(p.remaining_qty)),
+            String(flt(p.op_hrs)),
+            String(+(flt(p.op_hrs) * flt(p.remaining_qty)).toFixed(2)),
+            p.status || '', p.target_date || '',
+        ]);
+    });
+
+    doc.autoTable({
+        head: [cols],
+        body: rows,
+        startY: 38,
+        headStyles: { fillColor: [26, 58, 92], textColor: [255,255,255], fontStyle: 'bold', fontSize: 9 },
+        bodyStyles: { fillColor: [255, 255, 255], textColor: [36, 36, 36], fontSize: 8 },
+        alternateRowStyles: { fillColor: [249, 250, 251] },
+        columnStyles: { 0: { cellWidth: 28 }, 1: { cellWidth: 45 }, 2: { cellWidth: 22 }, 3: { cellWidth: 8 }, 4: { cellWidth: 8 }, 5: { cellWidth: 8 }, 6: { cellWidth: 14, halign: 'right' }, 7: { cellWidth: 16, halign: 'right' }, 8: { cellWidth: 16, halign: 'right' }, 9: { cellWidth: 18 }, 10: { cellWidth: 22 } },
+        margin: { left: 14, right: 14 },
+        styles: { lineColor: [156, 163, 175], lineWidth: 0.1 },
+        headBorder: { bottom: { color: [26, 58, 92], width: 1 } },
+    });
+
+    doc.save(`building${activeBuildingId}_parts_${stamp()}.pdf`);
+    showToast('Parts list PDF exported ✓', 'success');
+}
+
+// ── PRODUCTION SCHEDULE XLSX ──────────────────────────────
+function exportScheduleXLSX() {
+    const XLSX = window.XLSX; if (!XLSX) { showToast('SheetJS not ready', 'error'); return; }
+    if (!scheduledTasks.length) { showToast('No scheduled tasks to export', 'info'); return; }
+    const isMin = (appSettings.time_unit || 'h') === 'min';
+    const opHrsCol = isMin ? 'Op Minutes' : 'Op Hours';
+    const opMult = isMin ? 60 : 1;
+
+    const cols = [
+        { title: 'Seq',    width: 5,  align: 'center' },
+        { title: 'Part Number',   width: 22 },
+        { title: 'Part Name',     width: 30 },
+        { title: 'Vehicle',       width: 8,  align: 'center' },
+        { title: 'Unit',          width: 5,  align: 'center' },
+        { title: 'Machine',       width: 16 },
+        { title: 'Machine Type',  width: 14 },
+        { title: 'Shift',        width: 6,  align: 'center' },
+        { title: opHrsCol,        width: 12, align: 'right' },
+        { title: 'Start Day',    width: 10, align: 'right' },
+        { title: 'Est. Start Date', width: 16 },
+        { title: 'Est. End Date', width: 16 },
+        { title: 'Pinned',        width: 14 },
+    ];
+
+    const titleBanner = [{
+        v: `BUILDING #${activeBuildingId} — PRODUCTION SCHEDULE  ·  Generated ${fmtDate(new Date())}`, t: 's', s: {
+            font: { bold: true, color: { rgb: RPT.HEADER_FG }, sz: 13, name: 'Calibri' },
+            fill: { fgColor: { rgb: RPT.BG } },
+            alignment: { horizontal: 'center' },
+            border: { top: { style: 'medium', color: { rgb: RPT.ACCENT } }, bottom: { style: 'medium', color: { rgb: RPT.ACCENT } }, left: { style: 'medium', color: { rgb: RPT.ACCENT } }, right: { style: 'medium', color: { rgb: RPT.ACCENT } } }
+        }
+    }].concat(new Array(cols.length - 1).fill({ v: '', t: 's', s: { fill: { fgColor: { rgb: RPT.BG } } } }));
+
+    const sheetData = [titleBanner, _rh(cols)];
+
+    scheduledTasks.forEach((t, i) => {
+        const sd = addWD(appSettings.start_date, Math.floor(t.startDay), appSettings);
+        const endCeil = Math.ceil(t.endDay);
+        const ed = addWD(appSettings.start_date, endCeil > Math.floor(t.startDay) ? endCeil - 1 : endCeil, appSettings);
+        sheetData.push(_dr([
+            t.seqNum || i + 1, t.partNumber, t.partName, t.vehicle,
+            t.unitIndex || '', t.machineName, t.machineType,
+            t.shiftPref ? 'S' + t.shiftPref : '',
+            +(t.opHrs * opMult).toFixed(isMin ? 0 : 2),
+            t.startDay.toFixed(2),
+            fmtDate(sd), fmtDate(ed),
+            t.pinnedDate ? '📌 ' + t.pinnedDate : '',
+        ], { vehicle: t.vehicle, alt: i % 2 === 1 }));
+    });
+
+    const ws = _buildWs(sheetData, cols.map(c => c.width));
+    ws['!rows'] = sheetData.map((_, i) => i <= 1 ? { hpt: 24 } : { hpt: 18 });
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Production Schedule');
+    XLSX.writeFile(wb, `building${activeBuildingId}_schedule_${stamp()}.xlsx`);
+    showToast('Schedule exported ✓', 'success');
+}
+
+// ── PRODUCTION SCHEDULE PDF ───────────────────────────────
+function exportSchedulePDF() {
+    const { jsPDF } = window.jspdf; if (!jsPDF) { showToast('jsPDF not ready', 'error'); return; }
+    if (!scheduledTasks.length) { showToast('No scheduled tasks to export', 'info'); return; }
+
+    const doc = _makePdfDoc(`Building #${activeBuildingId} — Production Schedule`);
+
+    const cols = ['Seq', 'Part Number', 'Part Name', 'Vehicle', 'Machine', 'Op Hrs', 'Start Date', 'End Date', 'Pinned'];
+    const rows = scheduledTasks.map((t, i) => {
+        const sd = addWD(appSettings.start_date, Math.floor(t.startDay), appSettings);
+        const ed = addWD(appSettings.start_date, Math.ceil(t.endDay) - 1, appSettings);
+        return [
+            String(t.seqNum || i + 1),
+            t.partNumber, t.partName, t.vehicle || '',
+            t.machineName || '', String(+t.opHrs.toFixed(2)),
+            fmtDate(sd), fmtDate(ed),
+            t.pinnedDate ? '📌 ' + t.pinnedDate : '',
+        ];
+    });
+
+    doc.autoTable({
+        head: [cols],
+        body: rows,
+        startY: 38,
+        headStyles: { fillColor: [26, 58, 92], textColor: [255,255,255], fontStyle: 'bold', fontSize: 9 },
+        bodyStyles: { fillColor: [255, 255, 255], textColor: [36, 36, 36], fontSize: 8 },
+        alternateRowStyles: { fillColor: [249, 250, 251] },
+        columnStyles: { 0: { cellWidth: 10, halign: 'center' }, 1: { cellWidth: 28 }, 2: { cellWidth: 40 }, 3: { cellWidth: 14, halign: 'center' }, 4: { cellWidth: 24 }, 5: { cellWidth: 14, halign: 'right' }, 6: { cellWidth: 22 }, 7: { cellWidth: 22 }, 8: { cellWidth: 22 } },
+        margin: { left: 14, right: 14 },
+        styles: { lineColor: [156, 163, 175], lineWidth: 0.1 },
+        headBorder: { bottom: { color: [26, 58, 92], width: 1 } },
+    });
+
+    doc.save(`building${activeBuildingId}_schedule_${stamp()}.pdf`);
+    showToast('Schedule PDF exported ✓', 'success');
+}
+
+// ── MACHINE UTILIZATION XLSX ─────────────────────────────
+function exportMachineUtilXLSX() {
+    const XLSX = window.XLSX; if (!XLSX) { showToast('SheetJS not ready', 'error'); return; }
+    const active = (currentMachines || []).filter(m => m.is_active);
+    if (!active.length) { showToast('No active machines', 'info'); return; }
+
+    const cols = [
+        { title: 'Machine',         width: 20 },
+        { title: 'Type',           width: 16 },
+        { title: 'Tasks',          width: 8,  align: 'right' },
+        { title: 'Total Hours',    width: 16, align: 'right' },
+        { title: 'Daily Cap (hrs)', width: 18, align: 'right' },
+        { title: 'Utilization %',  width: 16, align: 'right' },
+        { title: 'Status',         width: 14 },
+    ];
+
+    const titleBanner = [{
+        v: `BUILDING #${activeBuildingId} — MACHINE UTILIZATION  ·  Generated ${fmtDate(new Date())}`, t: 's', s: {
+            font: { bold: true, color: { rgb: RPT.HEADER_FG }, sz: 13, name: 'Calibri' },
+            fill: { fgColor: { rgb: RPT.BG } },
+            alignment: { horizontal: 'center' },
+            border: { top: { style: 'medium', color: { rgb: RPT.ACCENT } }, bottom: { style: 'medium', color: { rgb: RPT.ACCENT } }, left: { style: 'medium', color: { rgb: RPT.ACCENT } }, right: { style: 'medium', color: { rgb: RPT.ACCENT } } }
+        }
+    }].concat(new Array(cols.length - 1).fill({ v: '', t: 's', s: { fill: { fgColor: { rgb: RPT.BG } } } }));
+
+    const sheetData = [titleBanner, _rh(cols)];
+
+    active.forEach((m, i) => {
+        const mTasks = (scheduledTasks || []).filter(t => t.machineId === m.id);
+        const totalHrs = mTasks.reduce((s, t) => s + t.opHrs, 0);
+        const dailyHrs = mDailyForMachine(m);
+        const maxEnd = mTasks.reduce((s, t) => Math.max(s, t.endDay), 0);
+        const totalCap = maxEnd > 0 ? maxEnd * dailyHrs : 0;
+        const utilPct = totalCap > 0 ? Math.min(100, Math.round((totalHrs / totalCap) * 100)) : 0;
+        const statusStr = utilPct > 85 ? 'HIGH LOAD' : utilPct > 65 ? 'MODERATE' : 'OK';
+        const statusFg = utilPct > 85 ? RPT.ERR : utilPct > 65 ? RPT.WARN : RPT.OK;
+
+        const row = _dr([m.name, m.machine_type, mTasks.length, totalHrs.toFixed(1), dailyHrs.toFixed(2), utilPct + '%', statusStr], { alt: i % 2 === 1 });
+        // Override utilization cell color
+        row[5] = { v: utilPct + '%', t: 's', s: {
+            font: { bold: true, color: { rgb: statusFg }, sz: 10, name: 'Calibri' },
+            fill: { fgColor: { rgb: i % 2 === 1 ? RPT.ROW_B : RPT.ROW_A } },
+            alignment: { horizontal: 'right', vertical: 'center' },
+            border: { top: { style: 'thin', color: { rgb: RPT.BORDER } }, bottom: { style: 'thin', color: { rgb: RPT.BORDER } }, left: { style: 'thin', color: { rgb: RPT.BORDER } }, right: { style: 'thin', color: { rgb: RPT.BORDER } } }
+        }};
+        // Override status cell color
+        row[6] = { v: statusStr, t: 's', s: {
+            font: { bold: true, color: { rgb: statusFg }, sz: 10, name: 'Calibri' },
+            fill: { fgColor: { rgb: i % 2 === 1 ? RPT.ROW_B : RPT.ROW_A } },
+            alignment: { vertical: 'center' },
+            border: { top: { style: 'thin', color: { rgb: RPT.BORDER } }, bottom: { style: 'thin', color: { rgb: RPT.BORDER } }, left: { style: 'thin', color: { rgb: RPT.BORDER } }, right: { style: 'thin', color: { rgb: RPT.BORDER } } }
+        }};
+        sheetData.push(row);
+    });
+
+    const ws = _buildWs(sheetData, cols.map(c => c.width));
+    ws['!rows'] = sheetData.map((_, i) => i <= 1 ? { hpt: 24 } : { hpt: 20 });
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Machine Utilization');
+    XLSX.writeFile(wb, `building${activeBuildingId}_machines_${stamp()}.xlsx`);
+    showToast('Machine utilization exported ✓', 'success');
+}
+
+// ── MACHINE UTILIZATION PDF ───────────────────────────────
+function exportMachineUtilPDF() {
+    const { jsPDF } = window.jspdf; if (!jsPDF) { showToast('jsPDF not ready', 'error'); return; }
+    const active = (currentMachines || []).filter(m => m.is_active);
+    if (!active.length) { showToast('No active machines', 'info'); return; }
+
+    const doc = _makePdfDoc(`Building #${activeBuildingId} — Machine Utilization`);
+
+    const cols = ['Machine', 'Type', 'Tasks', 'Total Hrs', 'Daily Cap (hrs)', 'Utilization %', 'Status'];
+    const rows = active.map(m => {
+        const mTasks = (scheduledTasks || []).filter(t => t.machineId === m.id);
+        const totalHrs = mTasks.reduce((s, t) => s + t.opHrs, 0);
+        const dailyHrs = mDailyForMachine(m);
+        const maxEnd = mTasks.reduce((s, t) => Math.max(s, t.endDay), 0);
+        const totalCap = maxEnd > 0 ? maxEnd * dailyHrs : 0;
+        const utilPct = totalCap > 0 ? Math.min(100, Math.round((totalHrs / totalCap) * 100)) : 0;
+        const statusStr = utilPct > 85 ? 'HIGH LOAD' : utilPct > 65 ? 'MODERATE' : 'OK';
+        return [m.name, m.machine_type, String(mTasks.length), String(totalHrs.toFixed(1)), String(dailyHrs.toFixed(2)), utilPct + '%', statusStr];
+    });
+
+    doc.autoTable({
+        head: [cols],
+        body: rows,
+        startY: 38,
+        headStyles: { fillColor: [26, 58, 92], textColor: [255,255,255], fontStyle: 'bold', fontSize: 9 },
+        bodyStyles: { fillColor: [255, 255, 255], textColor: [36, 36, 36], fontSize: 8 },
+        alternateRowStyles: { fillColor: [249, 250, 251] },
+        columnStyles: { 0: { cellWidth: 30 }, 1: { cellWidth: 25 }, 2: { cellWidth: 12, halign: 'right' }, 3: { cellWidth: 20, halign: 'right' }, 4: { cellWidth: 24, halign: 'right' }, 5: { cellWidth: 22, halign: 'right' }, 6: { cellWidth: 22 } },
+        margin: { left: 14, right: 14 },
+        styles: { lineColor: [156, 163, 175], lineWidth: 0.1 },
+        headBorder: { bottom: { color: [26, 58, 92], width: 1 } },
+    });
+
+    doc.save(`building${activeBuildingId}_machines_${stamp()}.pdf`);
+    showToast('Machine utilization PDF exported ✓', 'success');
+}
+
+// ── WEEKLY PLAN XLSX ──────────────────────────────────────
+function exportWeeklyPlanXLSX() {
+    const XLSX = window.XLSX; if (!XLSX) { showToast('SheetJS not ready', 'error'); return; }
+    if (!scheduledTasks.length) { showToast('No scheduled tasks to export', 'info'); return; }
+
+    const allDates = genDates(appSettings.start_date, ganttMaxDays(scheduledTasks), appSettings);
+    const weekMap = new Map();
+    allDates.forEach(d => {
+        const ws = new Date(d); ws.setDate(d.getDate() - d.getDay());
+        const wKey = localDateStr(ws);
+        if (!weekMap.has(wKey)) weekMap.set(wKey, { start: ws, days: [], tasks: [] });
+        weekMap.get(wKey).days.push(d);
+    });
+
+    const dayToWeek = new Map();
+    const weeks = Array.from(weekMap.values());
+    weeks.forEach((w, wi) => w.dayIndices = w.days.map((d, i) => {
+        const idx = allDates.findIndex(ad => localDateStr(ad) === localDateStr(d));
+        if (idx >= 0) dayToWeek.set(idx, wi);
+        return idx;
+    }));
+
+    scheduledTasks.forEach(t => {
+        const midDay = Math.floor((t.startDay + t.endDay) / 2);
+        const wIdx = dayToWeek.get(midDay) ?? dayToWeek.get(Math.floor(t.startDay)) ?? 0;
+        if (weeks[wIdx]) weeks[wIdx].tasks.push(t);
+    });
+
+    const cols = [
+        { title: 'Week of',           width: 16 },
+        { title: 'Days',             width: 8,  align: 'center' },
+        { title: 'Part Number',      width: 22 },
+        { title: 'Part Name',        width: 28 },
+        { title: 'Vehicle',          width: 8,  align: 'center' },
+        { title: 'Units',            width: 6,  align: 'right' },
+        { title: 'Machine',          width: 16 },
+        { title: 'Hours',            width: 10, align: 'right' },
+        { title: 'Vehicles (K9/K10/K11)', width: 20 },
+    ];
+
+    const titleBanner = [{
+        v: `BUILDING #${activeBuildingId} — WEEKLY PLAN  ·  Generated ${fmtDate(new Date())}`, t: 's', s: {
+            font: { bold: true, color: { rgb: RPT.HEADER_FG }, sz: 13, name: 'Calibri' },
+            fill: { fgColor: { rgb: RPT.BG } },
+            alignment: { horizontal: 'center' },
+            border: { top: { style: 'medium', color: { rgb: RPT.ACCENT } }, bottom: { style: 'medium', color: { rgb: RPT.ACCENT } }, left: { style: 'medium', color: { rgb: RPT.ACCENT } }, right: { style: 'medium', color: { rgb: RPT.ACCENT } } }
+        }
+    }].concat(new Array(cols.length - 1).fill({ v: '', t: 's', s: { fill: { fgColor: { rgb: RPT.BG } } } }));
+
+    const sheetData = [titleBanner, _rh(cols)];
+
+    weeks.forEach((w, wi) => {
+        if (!w.tasks.length) {
+            sheetData.push(_grh(`Week of ${fmtDate(w.start)} — No activity`).slice(0, cols.length));
+            return;
+        }
+        const byPart = {};
+        w.tasks.forEach(t => {
+            const k = t.partNumber;
+            if (!byPart[k]) byPart[k] = { partName: t.partName, machine: t.machineName, vehicles: {}, hours: 0, units: 0 };
+            byPart[k].vehicles[t.vehicle] = (byPart[k].vehicles[t.vehicle] || 0) + 1;
+            byPart[k].hours += t.opHrs;
+            byPart[k].units++;
+        });
+        Object.keys(byPart).forEach((pn, pi) => {
+            const { partName, machine, vehicles, hours, units } = byPart[pn];
+            const vehStr = Object.entries(vehicles).map(([v, c]) => `${v}×${c}`).join(' ');
+            const firstVeh = Object.keys(vehicles)[0];
+            sheetData.push(_dr([
+                pi === 0 ? fmtDate(w.start) : '',
+                pi === 0 ? String(w.days.length) : '',
+                pn, partName, firstVeh, units, machine,
+                hours.toFixed(1), vehStr,
+            ], { vehicle: firstVeh, alt: wi % 2 === 1 }));
+        });
+    });
+
+    const ws = _buildWs(sheetData, cols.map(c => c.width));
+    ws['!rows'] = sheetData.map((_, i) => i <= 1 ? { hpt: 24 } : { hpt: 18 });
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Weekly Plan');
+    XLSX.writeFile(wb, `building${activeBuildingId}_weekly_${stamp()}.xlsx`);
+    showToast('Weekly plan exported ✓', 'success');
+}
+
+// ── WEEKLY PLAN PDF ───────────────────────────────────────
+function exportWeeklyPlanPDF() {
+    const { jsPDF } = window.jspdf; if (!jsPDF) { showToast('jsPDF not ready', 'error'); return; }
+    if (!scheduledTasks.length) { showToast('No scheduled tasks to export', 'info'); return; }
+
+    const doc = _makePdfDoc(`Building #${activeBuildingId} — Weekly Plan`);
+
+    // Build week data
+    const allDates = genDates(appSettings.start_date, ganttMaxDays(scheduledTasks), appSettings);
+    const weekMap = new Map();
+    allDates.forEach(d => {
+        const ws = new Date(d); ws.setDate(d.getDate() - d.getDay());
+        const wKey = localDateStr(ws);
+        if (!weekMap.has(wKey)) weekMap.set(wKey, { start: ws, days: [], tasks: [] });
+        weekMap.get(wKey).days.push(d);
+    });
+    const dayToWeek = new Map();
+    const weeks = Array.from(weekMap.values());
+    weeks.forEach((w, wi) => w.dayIndices = w.days.map((d, i) => {
+        const idx = allDates.findIndex(ad => localDateStr(ad) === localDateStr(d));
+        if (idx >= 0) dayToWeek.set(idx, wi);
+        return idx;
+    }));
+    scheduledTasks.forEach(t => {
+        const midDay = Math.floor((t.startDay + t.endDay) / 2);
+        const wIdx = dayToWeek.get(midDay) ?? dayToWeek.get(Math.floor(t.startDay)) ?? 0;
+        if (weeks[wIdx]) weeks[wIdx].tasks.push(t);
+    });
+
+    const cols = ['Week of', 'Part Number', 'Part Name', 'Vehicle', 'Units', 'Machine', 'Hours', 'Vehicles'];
+    const rows = [];
+    weeks.forEach((w, wi) => {
+        if (!w.tasks.length) return;
+        const byPart = {};
+        w.tasks.forEach(t => {
+            const k = t.partNumber;
+            if (!byPart[k]) byPart[k] = { partName: t.partName, machine: t.machineName, vehicles: {}, hours: 0, units: 0 };
+            byPart[k].vehicles[t.vehicle] = (byPart[k].vehicles[t.vehicle] || 0) + 1;
+            byPart[k].hours += t.opHrs;
+            byPart[k].units++;
+        });
+        Object.keys(byPart).forEach((pn, pi) => {
+            const { partName, machine, vehicles, hours, units } = byPart[pn];
+            const vehStr = Object.entries(vehicles).map(([v, c]) => `${v}×${c}`).join(' ');
+            const firstVeh = Object.keys(vehicles)[0];
+            rows.push([pi === 0 ? fmtDate(w.start) : '', pn, partName, firstVeh, String(units), machine || '', String(hours.toFixed(1)), vehStr]);
+        });
+    });
+
+    doc.autoTable({
+        head: [cols],
+        body: rows,
+        startY: 38,
+        headStyles: { fillColor: [26, 58, 92], textColor: [255,255,255], fontStyle: 'bold', fontSize: 9 },
+        bodyStyles: { fillColor: [255, 255, 255], textColor: [36, 36, 36], fontSize: 8 },
+        alternateRowStyles: { fillColor: [249, 250, 251] },
+        columnStyles: { 0: { cellWidth: 22 }, 1: { cellWidth: 28 }, 2: { cellWidth: 42 }, 3: { cellWidth: 14, halign: 'center' }, 4: { cellWidth: 12, halign: 'right' }, 5: { cellWidth: 24 }, 6: { cellWidth: 14, halign: 'right' }, 7: { cellWidth: 28 } },
+        margin: { left: 14, right: 14 },
+        styles: { lineColor: [156, 163, 175], lineWidth: 0.1 },
+        headBorder: { bottom: { color: [26, 58, 92], width: 1 } },
+    });
+
+    doc.save(`building${activeBuildingId}_weekly_${stamp()}.pdf`);
+    showToast('Weekly plan PDF exported ✓', 'success');
+}
+
+// ── EXECUTIVE SUMMARY XLSX ───────────────────────────────
+function exportExecutiveSummaryXLSX() {
+    const XLSX = window.XLSX; if (!XLSX) { showToast('SheetJS not ready', 'error'); return; }
+
+    const uParts = (currentParts || []).length;
+    const tTasks = (currentParts || []).reduce((s, p) => s + flt(p.remaining_qty), 0);
+    const unitMult = (appSettings.time_unit || 'h') === 'min' ? 1 / 60 : 1;
+    const tHrs = (currentParts || []).reduce((s, p) => s + (flt(p.op_hrs) * unitMult) * flt(p.remaining_qty), 0);
+    const vc = { K9: 0, K10: 0, K11: 0 };
+    (scheduledTasks || []).forEach(t => { vc[t.vehicle] = (vc[t.vehicle] || 0) + 1; });
+    const activeCnt = (currentMachines || []).filter(m => m.is_active).length;
+    const totalWorkDays = scheduledTasks.length ? Math.ceil(Math.max(...scheduledTasks.map(t => t.endDay))) : 0;
+    const endDate = addWD(appSettings.start_date, totalWorkDays, appSettings);
+
+    const summaryCols = [
+        { title: 'METRIC',   width: 30 },
+        { title: 'VALUE',    width: 20 },
+    ];
+
+    const titleBanner = [{
+        v: `BUILDING #${activeBuildingId} — EXECUTIVE SUMMARY  ·  Generated ${fmtDate(new Date())}`, t: 's', s: {
+            font: { bold: true, color: { rgb: RPT.HEADER_FG }, sz: 13, name: 'Calibri' },
+            fill: { fgColor: { rgb: RPT.BG } },
+            alignment: { horizontal: 'center' },
+            border: { top: { style: 'medium', color: { rgb: RPT.ACCENT } }, bottom: { style: 'medium', color: { rgb: RPT.ACCENT } }, left: { style: 'medium', color: { rgb: RPT.ACCENT } }, right: { style: 'medium', color: { rgb: RPT.ACCENT } } }
+        }
+    }].concat(new Array(summaryCols.length - 1).fill({ v: '', t: 's', s: { fill: { fgColor: { rgb: RPT.BG } } } }));
+
+    const mkRow = (label, value, isAlt) => _dr([label, value], { alt: isAlt, bold: false });
+
+    const sheetData = [
+        titleBanner,
+        _rh(summaryCols),
+        mkRow('Plan Start Date', fmtDate(new Date(appSettings.start_date + 'T00:00:00')), false),
+        mkRow('Active Machines', String(activeCnt), true),
+        mkRow('Total Part Rows', String(uParts), false),
+        mkRow('Total Unit Tasks', tTasks.toFixed(1), true),
+        mkRow('Total Operation Hours', tHrs.toFixed(1) + ' hrs', false),
+        mkRow('Working Days Required', String(totalWorkDays), true),
+        mkRow('Projected Completion', fmtDate(endDate), false),
+        mkRow('Week Type', appSettings.saturday_working ? '6-day (Sat working)' : '5-day (Sun–Thu)', true),
+    ];
+
+    // Battalion breakdown section header
+    const batHdr = [{
+        v: 'BATTALION BREAKDOWN', t: 's', s: {
+            font: { bold: true, color: { rgb: RPT.HEADER_FG }, sz: 11, name: 'Calibri' },
+            fill: { fgColor: { rgb: RPT.HEADER } },
+            alignment: { horizontal: 'center', vertical: 'center' },
+            border: { top: { style: 'medium', color: { rgb: RPT.ACCENT } }, bottom: { style: 'medium', color: { rgb: RPT.ACCENT } }, left: { style: 'medium', color: { rgb: RPT.ACCENT } }, right: { style: 'medium', color: { rgb: RPT.ACCENT } } }
+        }
+    }].concat(new Array(summaryCols.length - 1).fill({ v: '', t: 's', s: { fill: { fgColor: { rgb: RPT.HEADER } } } }));
+
+    const batColHdr = _rh([{ title: 'BATTALION', width: 16 }, { title: 'UNITS', width: 12 }, { title: 'HOURS', width: 14 }, { title: 'SHARE', width: 12 }]);
+
+    const mkBatRow = (veh, bg, fg, count, hrs, pct) => _dr([veh, String(count) + ' units', String(hrs.toFixed(1)) + ' hrs', pct + '%'], { vehicle: veh });
+
+    const k9Hrs  = (scheduledTasks || []).filter(t => t.vehicle === 'K9').reduce((s, t) => s + t.opHrs, 0);
+    const k10Hrs = (scheduledTasks || []).filter(t => t.vehicle === 'K10').reduce((s, t) => s + t.opHrs, 0);
+    const k11Hrs = (scheduledTasks || []).filter(t => t.vehicle === 'K11').reduce((s, t) => s + t.opHrs, 0);
+
+    sheetData.push(batHdr, batColHdr);
+    sheetData.push(mkBatRow('K9',  RPT.K9_BG,  RPT.K9_FG,  vc.K9,  k9Hrs,  tTasks > 0 ? ((vc.K9 / tTasks * 100)).toFixed(1)  : '0'));
+    sheetData.push(mkBatRow('K10', RPT.K10_BG, RPT.K10_FG, vc.K10, k10Hrs, tTasks > 0 ? ((vc.K10 / tTasks * 100)).toFixed(1) : '0'));
+    sheetData.push(mkBatRow('K11', RPT.K11_BG, RPT.K11_FG, vc.K11, k11Hrs, tTasks > 0 ? ((vc.K11 / tTasks * 100)).toFixed(1) : '0'));
+
+    const ws = _buildWs(sheetData, summaryCols.map(c => c.width).concat([16, 14, 12]));
+    ws['!rows'] = sheetData.map((_, i) => i <= 1 ? { hpt: 24 } : i <= 10 ? { hpt: 20 } : { hpt: 22 });
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Executive Summary');
+    XLSX.writeFile(wb, `building${activeBuildingId}_summary_${stamp()}.xlsx`);
+    showToast('Executive summary exported ✓', 'success');
+}
+
+// ── EXECUTIVE SUMMARY PDF ────────────────────────────────
+function exportExecutiveSummaryPDF() {
+    const { jsPDF } = window.jspdf; if (!jsPDF) { showToast('jsPDF not ready', 'error'); return; }
+
+    const uParts = (currentParts || []).length;
+    const tTasks = (currentParts || []).reduce((s, p) => s + flt(p.remaining_qty), 0);
+    const unitMult = (appSettings.time_unit || 'h') === 'min' ? 1 / 60 : 1;
+    const tHrs = (currentParts || []).reduce((s, p) => s + (flt(p.op_hrs) * unitMult) * flt(p.remaining_qty), 0);
+    const vc = { K9: 0, K10: 0, K11: 0 };
+    (scheduledTasks || []).forEach(t => { vc[t.vehicle] = (vc[t.vehicle] || 0) + 1; });
+    const activeCnt = (currentMachines || []).filter(m => m.is_active).length;
+    const totalWorkDays = scheduledTasks.length ? Math.ceil(Math.max(...scheduledTasks.map(t => t.endDay))) : 0;
+    const endDate = addWD(appSettings.start_date, totalWorkDays, appSettings);
+    const k9Hrs  = (scheduledTasks || []).filter(t => t.vehicle === 'K9').reduce((s, t) => s + t.opHrs, 0);
+    const k10Hrs = (scheduledTasks || []).filter(t => t.vehicle === 'K10').reduce((s, t) => s + t.opHrs, 0);
+    const k11Hrs = (scheduledTasks || []).filter(t => t.vehicle === 'K11').reduce((s, t) => s + t.opHrs, 0);
+
+    const doc = _makePdfDoc(`Building #${activeBuildingId} — Executive Summary`);
+
+    // KPI Section
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(26, 58, 92);
+    doc.text('KEYWORD PERFORMANCE INDICATORS', 14, 38);
+
+    const kpiRows = [
+        ['Plan Start Date', fmtDate(new Date(appSettings.start_date + 'T00:00:00'))],
+        ['Active Machines', String(activeCnt)],
+        ['Total Part Rows', String(uParts)],
+        ['Total Unit Tasks', tTasks.toFixed(1)],
+        ['Total Operation Hours', tHrs.toFixed(1) + ' hrs'],
+        ['Working Days Required', String(totalWorkDays)],
+        ['Projected Completion', fmtDate(endDate)],
+        ['Week Type', appSettings.saturday_working ? '6-day (Sat working)' : '5-day (Sun–Thu)'],
+    ];
+
+    doc.autoTable({
+        head: [['METRIC', 'VALUE']],
+        body: kpiRows,
+        startY: 42,
+        headStyles: { fillColor: [26, 58, 92], textColor: [255,255,255], fontStyle: 'bold', fontSize: 9 },
+        bodyStyles: { fillColor: [255, 255, 255], textColor: [36, 36, 36], fontSize: 9 },
+        alternateRowStyles: { fillColor: [249, 250, 251] },
+        columnStyles: { 0: { cellWidth: 80, fontStyle: 'bold' }, 1: { cellWidth: 80, halign: 'right' } },
+        margin: { left: 14, right: 14 },
+        styles: { lineColor: [156, 163, 175], lineWidth: 0.1 },
+        headBorder: { bottom: { color: [26, 58, 92], width: 1 } },
+    });
+
+    // Battalion Breakdown Section
+    const finalY = doc.lastAutoTable.finalY + 10;
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(26, 58, 92);
+    doc.text('BATTALION BREAKDOWN', 14, finalY);
+
+    const batRows = [
+        ['K9',  String(vc.K9) + ' units',  String(k9Hrs.toFixed(1))  + ' hrs', tTasks > 0 ? ((vc.K9 / tTasks * 100)).toFixed(1)  + '%' : '0%'],
+        ['K10', String(vc.K10) + ' units', String(k10Hrs.toFixed(1)) + ' hrs', tTasks > 0 ? ((vc.K10 / tTasks * 100)).toFixed(1) + '%' : '0%'],
+        ['K11', String(vc.K11) + ' units', String(k11Hrs.toFixed(1)) + ' hrs', tTasks > 0 ? ((vc.K11 / tTasks * 100)).toFixed(1) + '%' : '0%'],
+    ];
+
+    doc.autoTable({
+        head: [['BATTALION', 'UNITS', 'HOURS', 'SHARE']],
+        body: batRows,
+        startY: finalY + 4,
+        headStyles: { fillColor: [26, 58, 92], textColor: [255,255,255], fontStyle: 'bold', fontSize: 9 },
+        bodyStyles: { fillColor: [255, 255, 255], textColor: [36, 36, 36], fontSize: 9 },
+        alternateRowStyles: { fillColor: [249, 250, 251] },
+        columnStyles: { 0: { cellWidth: 30, halign: 'center', fontStyle: 'bold' }, 1: { cellWidth: 40, halign: 'right' }, 2: { cellWidth: 40, halign: 'right' }, 3: { cellWidth: 30, halign: 'right' } },
+        margin: { left: 14, right: 14 },
+        styles: { lineColor: [156, 163, 175], lineWidth: 0.1 },
+        headBorder: { bottom: { color: [26, 58, 92], width: 1 } },
+        didParseCell: function(data) {
+            // Color battalion rows individually (light theme)
+            if (data.section === 'body' && data.row.index >= 0) {
+                if (data.row.index === 0) { // K9
+                    data.cell.styles.fillColor = [220, 252, 231];
+                    data.cell.styles.textColor = [22, 101, 52];
+                } else if (data.row.index === 1) { // K10
+                    data.cell.styles.fillColor = [254, 243, 199];
+                    data.cell.styles.textColor = [146, 64, 14];
+                } else if (data.row.index === 2) { // K11
+                    data.cell.styles.fillColor = [237, 233, 254];
+                    data.cell.styles.textColor = [107, 33, 168];
+                }
+            }
+        },
+    });
+
+    doc.save(`building${activeBuildingId}_summary_${stamp()}.pdf`);
+    showToast('Executive summary PDF exported ✓', 'success');
+}
+
+// ── SHARED PDF HELPERS ─────────────────────────────────────
+function _makePdfDoc(title) {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+
+    // Header bar (light theme)
+    doc.setFillColor(255, 255, 255);
+    doc.rect(0, 0, 297, 14, 'F');
+
+    // Navy accent line
+    doc.setFillColor(26, 58, 92);
+    doc.rect(0, 14, 297, 1.5, 'F');
+
+    // Title
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(13);
+    doc.setTextColor(26, 58, 92);
+    doc.text(title, 14, 9);
+
+    // Timestamp right-aligned
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(107, 114, 128);
+    doc.text(`Generated: ${fmtDate(new Date())}`, 283, 9, { align: 'right' });
+
+    // Footer
+    const pageH = doc.internal.pageSize.getHeight();
+    doc.setFillColor(255, 255, 255);
+    doc.rect(0, pageH - 8, 297, 8, 'F');
+    doc.setFillColor(26, 58, 92);
+    doc.rect(0, pageH - 8, 297, 0.5, 'F');
+    doc.setFontSize(7);
+    doc.setTextColor(107, 114, 128);
+    doc.text('Building #1 Machining Production Planning', 14, pageH - 3);
+    doc.text(`Page 1 of ${doc.internal.getNumberOfPages()}`, 283, pageH - 3, { align: 'right' });
+
+    // Set text color default for body (dark for light theme)
+    doc.setTextColor(36, 36, 36);
+    doc.setFontSize(9);
+
+    return doc;
+}
+
+function stamp() {
+    return new Date().toISOString().slice(0, 10);
+}
+
+// ── PARTS LIST XLSX ───────────────────────────────────────
 function exportPartsXLSX() {
     const XLSX = window.XLSX; if (!XLSX) { showToast('SheetJS not ready', 'error'); return; }
     const isMin = (appSettings.time_unit || 'h') === 'min';
@@ -1814,33 +2694,31 @@ function exportPartsXLSX() {
         { title: 'Target Date', width: 14 },
     ];
 
+    const titleBanner = [{
+        v: `BUILDING #${activeBuildingId} — PARTS LIST  ·  Generated ${fmtDate(new Date())}`, t: 's', s: {
+            font: { bold: true, color: { rgb: RPT.HEADER_FG }, sz: 13, name: 'Calibri' },
+            fill: { fgColor: { rgb: RPT.BG } },
+            alignment: { horizontal: 'center' },
+            border: { top: { style: 'medium', color: { rgb: RPT.ACCENT } }, bottom: { style: 'medium', color: { rgb: RPT.ACCENT } }, left: { style: 'medium', color: { rgb: RPT.ACCENT } }, right: { style: 'medium', color: { rgb: RPT.ACCENT } } }
+        }
+    }].concat(new Array(cols.length - 1).fill({ v: '', t: 's', s: { fill: { fgColor: { rgb: RPT.BG } } } }));
+
+    const sheetData = [titleBanner, _rh(cols)];
+
     // Group parts by location
     const grouped = {};
-    allParts.forEach(p => {
+    (currentParts || allParts || []).forEach(p => {
         const loc = p.location || 'Unknown';
         if (!grouped[loc]) grouped[loc] = [];
         grouped[loc].push(p);
     });
     const locs = Object.keys(grouped).sort();
 
-    const sheetData = [];
-    const locOrder = { 'Unknown': 9999 };
-
-    // Header
-    sheetData.push(_mkHdrRow(cols));
-
     locs.forEach((loc, li) => {
-        // Location group header
-        sheetData.push([{ v: `◀ ${loc}`, t: 's', s: {
-            font: { bold: true, color: { rgb: 'FFF59E0B' } },
-            fill: { fgColor: { rgb: 'FF1C2230' } },
-            alignment: { horizontal: 'left' },
-            border: { top: { style: 'thin', color: { rgb: XLSX_COLORS.BORDER } }, bottom: { style: 'thin', color: { rgb: XLSX_COLORS.BORDER } }, left: { style: 'thin', color: { rgb: XLSX_COLORS.BORDER } }, right: { style: 'thin', color: { rgb: XLSX_COLORS.BORDER } } }
-        }}].concat(new Array(cols.length - 1).fill({ v: '', t: 's', s: { fill: { fgColor: { rgb: 'FF1C2230' } } } })));
-
-        grouped[loc].forEach(p => {
-            const row = [
-                p.part_number, p.part_name, p.location || '',
+        sheetData.push(_grh(`  ▸ ${loc}`));
+        grouped[loc].forEach((p) => {
+            sheetData.push(_dr([
+                p.part_number || '', p.part_name || '', p.location || '',
                 p.k9 ? '●' : '', p.k10 ? '●' : '', p.k11 ? '●' : '',
                 flt(p.remaining_qty),
                 flt(p.op_hrs),
@@ -1852,287 +2730,17 @@ function exportPartsXLSX() {
                 p.k10_qty != null ? flt(p.k10_qty) : '',
                 p.k11_qty != null ? flt(p.k11_qty) : '',
                 p.target_date || '',
-            ];
-            sheetData.push(_mkRow(row, { bg: li % 2 === 0 ? XLSX_COLORS.ROW_BASE : XLSX_COLORS.ROW_ALT }));
+            ], { alt: li % 2 === 1 }));
         });
     });
 
-    const ws = XLSX.utils.aoa_to_sheet(sheetData);
-    ws['!cols'] = cols.map(c => ({ wch: c.width }));
-    ws['!rows'] = sheetData.map((_, i) => i === 0 ? { hpt: 22 } : { hpt: 18 });
+    const ws = _buildWs(sheetData, cols.map(c => c.width));
+    ws['!rows'] = sheetData.map((_, i) => i <= 1 ? { hpt: 24 } : { hpt: 18 });
 
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Parts List');
-    XLSX.writeFile(wb, `building${activeBuildingId}_parts_${new Date().toISOString().slice(0, 10)}.xlsx`);
+    XLSX.writeFile(wb, `building${activeBuildingId}_parts_${stamp()}.xlsx`);
     showToast('Parts list exported ✓', 'success');
-}
-
-/* ── Production Schedule ──────────────────────────────── */
-function exportScheduleXLSX() {
-    const XLSX = window.XLSX; if (!XLSX) { showToast('SheetJS not ready', 'error'); return; }
-    if (!scheduledTasks.length) { showToast('No scheduled tasks to export', 'info'); return; }
-    const isMin = (appSettings.time_unit || 'h') === 'min';
-    const opHrsCol = isMin ? 'Op Minutes' : 'Op Hours';
-    const opMult = isMin ? 60 : 1;
-
-    const cols = [
-        { title: 'Seq', width: 5, align: 'center' },
-        { title: 'Part Number', width: 22 },
-        { title: 'Part Name', width: 30 },
-        { title: 'Vehicle', width: 8, align: 'center' },
-        { title: 'Unit', width: 5, align: 'center' },
-        { title: 'Machine', width: 16 },
-        { title: 'Machine Type', width: 14 },
-        { title: 'Shift', width: 6, align: 'center' },
-        { title: opHrsCol, width: 12, align: 'right' },
-        { title: 'Start Day', width: 10, align: 'right' },
-        { title: 'Est. Start Date', width: 16 },
-        { title: 'Est. End Date', width: 16 },
-        { title: 'Pinned', width: 12 },
-    ];
-
-    const sheetData = [_mkHdrRow(cols)];
-
-    scheduledTasks.forEach(t => {
-        const sd = addWD(appSettings.start_date, Math.floor(t.startDay), appSettings);
-        const endCeil = Math.ceil(t.endDay);
-        const ed = addWD(appSettings.start_date, endCeil > Math.floor(t.startDay) ? endCeil - 1 : endCeil, appSettings);
-        const row = [
-            t.seqNum, t.partNumber, t.partName, t.vehicle,
-            t.unitIndex || '', t.machineName, t.machineType,
-            t.shiftPref ? 'S' + t.shiftPref : '',
-            +(t.opHrs * opMult).toFixed(isMin ? 0 : 2),
-            t.startDay.toFixed(2),
-            fmtDate(sd), fmtDate(ed),
-            t.pinnedDate ? '📌 ' + t.pinnedDate : '',
-        ];
-        sheetData.push(_mkRow(row, { vehicle: t.vehicle }));
-    });
-
-    const ws = XLSX.utils.aoa_to_sheet(sheetData);
-    ws['!cols'] = cols.map(c => ({ wch: c.width }));
-    ws['!rows'] = sheetData.map((_, i) => i === 0 ? { hpt: 22 } : { hpt: 18 });
-
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Production Schedule');
-    XLSX.writeFile(wb, `building${activeBuildingId}_schedule_${new Date().toISOString().slice(0, 10)}.xlsx`);
-    showToast('Schedule exported ✓', 'success');
-}
-
-/* ── Machine Utilization ──────────────────────────────── */
-function exportMachineUtilXLSX() {
-    const XLSX = window.XLSX; if (!XLSX) { showToast('SheetJS not ready', 'error'); return; }
-    const active = currentMachines.filter(m => m.is_active);
-    if (!active.length) { showToast('No active machines', 'info'); return; }
-
-    const cols = [
-        { title: 'Machine', width: 20 },
-        { title: 'Type', width: 16 },
-        { title: 'Tasks', width: 8, align: 'right' },
-        { title: 'Total Hours', width: 14, align: 'right' },
-        { title: 'Daily Cap. (hrs)', width: 16, align: 'right' },
-        { title: 'Utilization %', width: 15, align: 'right' },
-        { title: 'Status', width: 14 },
-    ];
-
-    const sheetData = [_mkHdrRow(cols)];
-
-    active.forEach(m => {
-        const mTasks = scheduledTasks.filter(t => t.machineId === m.id);
-        const totalHrs = mTasks.reduce((s, t) => s + t.opHrs, 0);
-        const dailyHrs = mDailyForMachine(m);
-        const maxEnd = mTasks.reduce((s, t) => Math.max(s, t.endDay), 0);
-        const totalCap = maxEnd > 0 ? maxEnd * dailyHrs : 0;
-        const utilPct = totalCap > 0 ? Math.min(100, Math.round((totalHrs / totalCap) * 100)) : 0;
-        const utilColor = utilPct > 85 ? XLSX_COLORS.ERR : utilPct > 65 ? XLSX_COLORS.WARN : XLSX_COLORS.OK;
-
-        const row = [
-            m.name, m.machine_type, mTasks.length,
-            totalHrs.toFixed(1), dailyHrs.toFixed(2),
-            utilPct + '%',
-            utilPct > 85 ? 'HIGH LOAD' : utilPct > 65 ? 'MODERATE' : 'OK',
-        ];
-        const styled = _mkRow(row, { bg: XLSX_COLORS.ROW_BASE });
-        // Override utilization cell with color
-        styled[5] = { v: utilPct + '%', t: 's', s: {
-            font: { bold: true, color: { rgb: utilColor } },
-            fill: { fgColor: { rgb: XLSX_COLORS.ROW_BASE } },
-            alignment: { horizontal: 'right', vertical: 'center' },
-            border: { top: { style: 'thin', color: { rgb: XLSX_COLORS.BORDER } }, bottom: { style: 'thin', color: { rgb: XLSX_COLORS.BORDER } }, left: { style: 'thin', color: { rgb: XLSX_COLORS.BORDER } }, right: { style: 'thin', color: { rgb: XLSX_COLORS.BORDER } } }
-        }};
-        sheetData.push(styled);
-    });
-
-    const ws = XLSX.utils.aoa_to_sheet(sheetData);
-    ws['!cols'] = cols.map(c => ({ wch: c.width }));
-    ws['!rows'] = sheetData.map((_, i) => i === 0 ? { hpt: 22 } : { hpt: 18 });
-
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Machine Utilization');
-    XLSX.writeFile(wb, `building${activeBuildingId}_machines_${new Date().toISOString().slice(0, 10)}.xlsx`);
-    showToast('Machine utilization exported ✓', 'success');
-}
-
-/* ── Weekly Plan ──────────────────────────────────────── */
-function exportWeeklyPlanXLSX() {
-    const XLSX = window.XLSX; if (!XLSX) { showToast('SheetJS not ready', 'error'); return; }
-    if (!scheduledTasks.length) { showToast('No scheduled tasks to export', 'info'); return; }
-
-    // Build week buckets
-    const allDates = genDates(appSettings.start_date, ganttMaxDays(scheduledTasks), appSettings);
-    const weekMap = new Map();
-    allDates.forEach((d, i) => {
-        const ws = new Date(d); ws.setDate(d.getDate() - d.getDay());
-        const wKey = localDateStr(ws);
-        if (!weekMap.has(wKey)) weekMap.set(wKey, { start: ws, days: [], tasks: [] });
-        weekMap.get(wKey).days.push(d);
-    });
-
-    // Assign tasks to weeks
-    const dayToWeek = new Map();
-    const weeks = Array.from(weekMap.values());
-    weeks.forEach((w, wi) => w.dayIndices = w.days.map((d, i) => {
-        const idx = allDates.findIndex(ad => localDateStr(ad) === localDateStr(d));
-        if (idx >= 0) dayToWeek.set(idx, wi);
-        return idx;
-    }));
-
-    scheduledTasks.forEach(t => {
-        const midDay = Math.floor((t.startDay + t.endDay) / 2);
-        const wIdx = dayToWeek.get(midDay) ?? dayToWeek.get(Math.floor(t.startDay)) ?? 0;
-        if (weeks[wIdx]) weeks[wIdx].tasks.push(t);
-    });
-
-    const cols = [
-        { title: 'Week of', width: 16 },
-        { title: 'Days', width: 8, align: 'center' },
-        { title: 'Part Number', width: 22 },
-        { title: 'Part Name', width: 28 },
-        { title: 'Vehicle', width: 8, align: 'center' },
-        { title: 'Units', width: 6, align: 'right' },
-        { title: 'Machine', width: 16 },
-        { title: 'Hours', width: 10, align: 'right' },
-        { title: 'Vehicles (K9/K10/K11)', width: 20 },
-    ];
-
-    const sheetData = [_mkHdrRow(cols)];
-
-    weeks.forEach((w, wi) => {
-        if (!w.tasks.length) {
-            // Empty week header
-            sheetData.push([{ v: `${fmtDate(w.start)}`, t: 's', s: {
-                font: { bold: true, color: { rgb: XLSX_COLORS.HDR_FG } },
-                fill: { fgColor: { rgb: XLSX_COLORS.HDR_BG } },
-                border: { top: { style: 'thin', color: { rgb: XLSX_COLORS.BORDER } }, bottom: { style: 'thin', color: { rgb: XLSX_COLORS.BORDER } }, left: { style: 'thin', color: { rgb: XLSX_COLORS.BORDER } }, right: { style: 'thin', color: { rgb: XLSX_COLORS.BORDER } } }
-            }}].concat(new Array(cols.length - 1).fill({ v: '— No activity —', t: 's', s: { font: { color: { rgb: 'FF4A5568' } }, fill: { fgColor: { rgb: XLSX_COLORS.ROW_ALT } }, border: { top: { style: 'thin', color: { rgb: XLSX_COLORS.BORDER } }, bottom: { style: 'thin', color: { rgb: XLSX_COLORS.BORDER } }, left: { style: 'thin', color: { rgb: XLSX_COLORS.BORDER } }, right: { style: 'thin', color: { rgb: XLSX_COLORS.BORDER } } } } })));
-            return;
-        }
-
-        // Group tasks by part
-        const byPart = {};
-        w.tasks.forEach(t => {
-            const k = t.partNumber;
-            if (!byPart[k]) byPart[k] = { partName: t.partName, machine: t.machineName, vehicles: {}, hours: 0, units: 0 };
-            byPart[k].vehicles[t.vehicle] = (byPart[k].vehicles[t.vehicle] || 0) + 1;
-            byPart[k].hours += t.opHrs;
-            byPart[k].units++;
-        });
-
-        Object.keys(byPart).forEach((pn, pi) => {
-            const { partName, machine, vehicles, hours, units } = byPart[pn];
-            const vehStr = Object.entries(vehicles).map(([v, c]) => `${v}×${c}`).join(' ');
-            const firstVeh = Object.keys(vehicles)[0];
-            const row = [
-                pi === 0 ? fmtDate(w.start) : '',
-                pi === 0 ? String(w.days.length) : '',
-                pn, partName, firstVeh, units, machine,
-                hours.toFixed(1), vehStr,
-            ];
-            sheetData.push(_mkRow(row, { vehicle: firstVeh, bg: wi % 2 === 0 ? XLSX_COLORS.ROW_BASE : XLSX_COLORS.ROW_ALT }));
-        });
-    });
-
-    const ws = XLSX.utils.aoa_to_sheet(sheetData);
-    ws['!cols'] = cols.map(c => ({ wch: c.width }));
-    ws['!rows'] = sheetData.map((_, i) => i === 0 ? { hpt: 22 } : { hpt: 18 });
-
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Weekly Plan');
-    XLSX.writeFile(wb, `building${activeBuildingId}_weekly_${new Date().toISOString().slice(0, 10)}.xlsx`);
-    showToast('Weekly plan exported ✓', 'success');
-}
-
-/* ── Executive Summary ────────────────────────────────── */
-function exportExecutiveSummaryXLSX() {
-    const XLSX = window.XLSX; if (!XLSX) { showToast('SheetJS not ready', 'error'); return; }
-
-    // Collect KPIs
-    const uParts = currentParts.length;
-    const tTasks = currentParts.reduce((s, p) => s + flt(p.remaining_qty), 0);
-    const unitMult = (appSettings.time_unit || 'h') === 'min' ? 1 / 60 : 1;
-    const tHrs = currentParts.reduce((s, p) => s + (flt(p.op_hrs) * unitMult) * flt(p.remaining_qty), 0);
-    const vc = { K9: 0, K10: 0, K11: 0 };
-    scheduledTasks.forEach(t => { vc[t.vehicle] = (vc[t.vehicle] || 0) + 1; });
-    const activeCnt = currentMachines.filter(m => m.is_active).length;
-    const totalWorkDays = scheduledTasks.length ? Math.ceil(Math.max(...scheduledTasks.map(t => t.endDay))) : 0;
-    const endDate = addWD(appSettings.start_date, totalWorkDays, appSettings);
-
-    const mkSummaryRow = (label, value, bg) => [
-        { v: label, t: 's', s: { font: { bold: true, color: { rgb: 'FFF59E0B' } }, fill: { fgColor: { rgb: bg || XLSX_COLORS.ROW_BASE } }, alignment: { horizontal: 'left' }, border: { top: { style: 'thin', color: { rgb: XLSX_COLORS.BORDER } }, bottom: { style: 'thin', color: { rgb: XLSX_COLORS.BORDER } }, left: { style: 'thin', color: { rgb: XLSX_COLORS.BORDER } }, right: { style: 'thin', color: { rgb: XLSX_COLORS.BORDER } } } } },
-        { v: value, t: 's', s: { font: { color: { rgb: 'FFEDf2f7' } }, fill: { fgColor: { rgb: bg || XLSX_COLORS.ROW_BASE } }, alignment: { horizontal: 'right' }, border: { top: { style: 'thin', color: { rgb: XLSX_COLORS.BORDER } }, bottom: { style: 'thin', color: { rgb: XLSX_COLORS.BORDER } }, left: { style: 'thin', color: { rgb: XLSX_COLORS.BORDER } }, right: { style: 'thin', color: { rgb: XLSX_COLORS.BORDER } } } } },
-    ];
-
-    const mkVehicleRow = (veh, color, bg, count, hrs, pct) => [
-        { v: `${veh}`, t: 's', s: { font: { bold: true, color: { rgb: color } }, fill: { fgColor: { rgb: bg } }, alignment: { horizontal: 'center' }, border: { top: { style: 'thin', color: { rgb: XLSX_COLORS.BORDER } }, bottom: { style: 'thin', color: { rgb: XLSX_COLORS.BORDER } }, left: { style: 'thin', color: { rgb: XLSX_COLORS.BORDER } }, right: { style: 'thin', color: { rgb: XLSX_COLORS.BORDER } } } } },
-        { v: `${count} units`, t: 's', s: { font: { color: { rgb: 'FFEDf2f7' } }, fill: { fgColor: { rgb: bg } }, alignment: { horizontal: 'right' }, border: { top: { style: 'thin', color: { rgb: XLSX_COLORS.BORDER } }, bottom: { style: 'thin', color: { rgb: XLSX_COLORS.BORDER } }, left: { style: 'thin', color: { rgb: XLSX_COLORS.BORDER } }, right: { style: 'thin', color: { rgb: XLSX_COLORS.BORDER } } } } },
-        { v: `${hrs.toFixed(1)} hrs`, t: 's', s: { font: { color: { rgb: 'FFEDf2f7' } }, fill: { fgColor: { rgb: bg } }, alignment: { horizontal: 'right' }, border: { top: { style: 'thin', color: { rgb: XLSX_COLORS.BORDER } }, bottom: { style: 'thin', color: { rgb: XLSX_COLORS.BORDER } }, left: { style: 'thin', color: { rgb: XLSX_COLORS.BORDER } }, right: { style: 'thin', color: { rgb: XLSX_COLORS.BORDER } } } } },
-        { v: `${pct}%`, t: 's', s: { font: { bold: true, color: { rgb: color } }, fill: { fgColor: { rgb: bg } }, alignment: { horizontal: 'right' }, border: { top: { style: 'thin', color: { rgb: XLSX_COLORS.BORDER } }, bottom: { style: 'thin', color: { rgb: XLSX_COLORS.BORDER } }, left: { style: 'thin', color: { rgb: XLSX_COLORS.BORDER } }, right: { style: 'thin', color: { rgb: XLSX_COLORS.BORDER } } } } },
-    ];
-
-    // Title row
-    const titleRow = [{ v: `BUILDING #${activeBuildingId} — PRODUCTION SUMMARY`, t: 's', s: {
-        font: { bold: true, sz: 14, color: { rgb: XLSX_COLORS.HDR_FG } },
-        fill: { fgColor: { rgb: 'FF0F1117' } },
-        alignment: { horizontal: 'center' },
-        border: { top: { style: 'medium', color: { rgb: XLSX_COLORS.HDR_ACCENT } }, bottom: { style: 'medium', color: { rgb: XLSX_COLORS.HDR_ACCENT } }, left: { style: 'medium', color: { rgb: XLSX_COLORS.HDR_ACCENT } }, right: { style: 'medium', color: { rgb: XLSX_COLORS.HDR_ACCENT } } }
-    }}];
-    const emptyTitle = new Array(3).fill({ v: '', t: 's', s: { fill: { fgColor: { rgb: 'FF0F1117' } } } });
-
-    // Header labels
-    const kpiHdrRow = [
-        { v: 'METRIC', t: 's', s: { font: { bold: true, color: { rgb: XLSX_COLORS.HDR_FG } }, fill: { fgColor: { rgb: XLSX_COLORS.HDR_BG } }, alignment: { horizontal: 'left' }, border: { top: { style: 'thin', color: { rgb: XLSX_COLORS.HDR_ACCENT } }, bottom: { style: 'thin', color: { rgb: XLSX_COLORS.HDR_ACCENT } }, left: { style: 'thin', color: { rgb: XLSX_COLORS.BORDER } }, right: { style: 'thin', color: { rgb: XLSX_COLORS.BORDER } } } } },
-        { v: 'VALUE', t: 's', s: { font: { bold: true, color: { rgb: XLSX_COLORS.HDR_FG } }, fill: { fgColor: { rgb: XLSX_COLORS.HDR_BG } }, alignment: { horizontal: 'right' }, border: { top: { style: 'thin', color: { rgb: XLSX_COLORS.HDR_ACCENT } }, bottom: { style: 'thin', color: { rgb: XLSX_COLORS.HDR_ACCENT } }, left: { style: 'thin', color: { rgb: XLSX_COLORS.BORDER } }, right: { style: 'thin', color: { rgb: XLSX_COLORS.BORDER } } } } },
-    ];
-
-    const sheetData = [
-        [titleRow[0], ...emptyTitle],
-        [kpiHdrRow[0], kpiHdrRow[1]],
-        ...mkSummaryRow('Plan Start Date', fmtDate(new Date(appSettings.start_date + 'T00:00:00'))),
-        ...mkSummaryRow('Active Machines', String(activeCnt)),
-        ...mkSummaryRow('Total Part Rows', String(uParts)),
-        ...mkSummaryRow('Total Unit Tasks', tTasks.toFixed(1)),
-        ...mkSummaryRow('Total Operation Hours', tHrs.toFixed(1) + ' hrs'),
-        ...mkSummaryRow('Working Days Required', String(totalWorkDays)),
-        ...mkSummaryRow('Projected Completion', fmtDate(endDate)),
-        ...mkSummaryRow('Week Type', appSettings.saturday_working ? '6-day (Sat working)' : '5-day (Sun–Thu)'),
-        // Battalion header
-        [{ v: 'BATTALION BREAKDOWN', t: 's', s: { font: { bold: true, color: { rgb: XLSX_COLORS.HDR_FG } }, fill: { fgColor: { rgb: XLSX_COLORS.HDR_BG } }, alignment: { horizontal: 'center' }, border: { top: { style: 'thin', color: { rgb: XLSX_COLORS.HDR_ACCENT } }, bottom: { style: 'thin', color: { rgb: XLSX_COLORS.HDR_ACCENT } }, left: { style: 'thin', color: { rgb: XLSX_COLORS.BORDER } }, right: { style: 'thin', color: { rgb: XLSX_COLORS.BORDER } } } } },
-         { v: 'UNITS', t: 's', s: { font: { bold: true, color: { rgb: XLSX_COLORS.HDR_FG } }, fill: { fgColor: { rgb: XLSX_COLORS.HDR_BG } }, alignment: { horizontal: 'center' }, border: { top: { style: 'thin', color: { rgb: XLSX_COLORS.HDR_ACCENT } }, bottom: { style: 'thin', color: { rgb: XLSX_COLORS.HDR_ACCENT } }, left: { style: 'thin', color: { rgb: XLSX_COLORS.BORDER } }, right: { style: 'thin', color: { rgb: XLSX_COLORS.BORDER } } } } },
-         { v: 'HOURS', t: 's', s: { font: { bold: true, color: { rgb: XLSX_COLORS.HDR_FG } }, fill: { fgColor: { rgb: XLSX_COLORS.HDR_BG } }, alignment: { horizontal: 'center' }, border: { top: { style: 'thin', color: { rgb: XLSX_COLORS.HDR_ACCENT } }, bottom: { style: 'thin', color: { rgb: XLSX_COLORS.HDR_ACCENT } }, left: { style: 'thin', color: { rgb: XLSX_COLORS.BORDER } }, right: { style: 'thin', color: { rgb: XLSX_COLORS.BORDER } } } } },
-         { v: 'SHARE', t: 's', s: { font: { bold: true, color: { rgb: XLSX_COLORS.HDR_FG } }, fill: { fgColor: { rgb: XLSX_COLORS.HDR_BG } }, alignment: { horizontal: 'center' }, border: { top: { style: 'thin', color: { rgb: XLSX_COLORS.HDR_ACCENT } }, bottom: { style: 'thin', color: { rgb: XLSX_COLORS.HDR_ACCENT } }, left: { style: 'thin', color: { rgb: XLSX_COLORS.BORDER } }, right: { style: 'thin', color: { rgb: XLSX_COLORS.BORDER } } } } }],
-        ...mkVehicleRow('K9', XLSX_COLORS.K9_FG, XLSX_COLORS.K9_BG, vc.K9 || 0, scheduledTasks.filter(t => t.vehicle === 'K9').reduce((s, t) => s + t.opHrs, 0), tTasks > 0 ? ((vc.K9 / tTasks) * 100).toFixed(1) : '0'),
-        ...mkVehicleRow('K10', XLSX_COLORS.K10_FG, XLSX_COLORS.K10_BG, vc.K10 || 0, scheduledTasks.filter(t => t.vehicle === 'K10').reduce((s, t) => s + t.opHrs, 0), tTasks > 0 ? ((vc.K10 / tTasks) * 100).toFixed(1) : '0'),
-        ...mkVehicleRow('K11', XLSX_COLORS.K11_FG, XLSX_COLORS.K11_BG, vc.K11 || 0, scheduledTasks.filter(t => t.vehicle === 'K11').reduce((s, t) => s + t.opHrs, 0), tTasks > 0 ? ((vc.K11 / tTasks) * 100).toFixed(1) : '0'),
-    ];
-
-    const ws = XLSX.utils.aoa_to_sheet(sheetData);
-    ws['!cols'] = [{ wch: 28 }, { wch: 16 }, { wch: 16 }, { wch: 12 }];
-    ws['!rows'] = sheetData.map((_, i) => i === 0 ? { hpt: 30 } : { hpt: 20 });
-
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Executive Summary');
-    XLSX.writeFile(wb, `building${activeBuildingId}_summary_${new Date().toISOString().slice(0, 10)}.xlsx`);
-    showToast('Executive summary exported ✓', 'success');
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -2224,7 +2832,12 @@ async function updateDBStats() {
 const THEME_KEY = 'b1_theme';
 function applyTheme(t) {
     document.documentElement.setAttribute('data-theme', t);
-    const b = $('theme-toggle-btn'); if (b) b.textContent = t === 'light' ? '☾' : '☀';
+    const b = $('theme-toggle-btn');
+    if (b) {
+        b.innerHTML = t === 'light'
+            ? `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>`
+            : `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>`;
+    }
     try { localStorage.setItem(THEME_KEY, t); } catch (e) { }
 }
 function toggleTheme() { applyTheme(document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark'); }
@@ -2335,12 +2948,39 @@ function attachListeners() {
     $('reports-close')?.addEventListener('click', () => $('reports-modal')?.classList.add('hidden'));
     $('reports-cancel')?.addEventListener('click', () => $('reports-modal')?.classList.add('hidden'));
     $('reports-modal')?.addEventListener('click', e => { if (e.target === $('reports-modal')) $('reports-modal').classList.add('hidden'); });
-    $('rpt-parts-btn')?.addEventListener('click', () => { exportPartsXLSX(); $('reports-modal')?.classList.add('hidden'); });
-    $('rpt-sched-btn')?.addEventListener('click', () => { exportScheduleXLSX(); $('reports-modal')?.classList.add('hidden'); });
-    $('rpt-machine-btn')?.addEventListener('click', () => { exportMachineUtilXLSX(); $('reports-modal')?.classList.add('hidden'); });
-    $('rpt-weekly-btn')?.addEventListener('click', () => { exportWeeklyPlanXLSX(); $('reports-modal')?.classList.add('hidden'); });
-    $('rpt-summary-btn')?.addEventListener('click', () => { exportExecutiveSummaryXLSX(); $('reports-modal')?.classList.add('hidden'); });
-    $('rpt-print-btn')?.addEventListener('click', () => { window.print(); $('reports-modal')?.classList.add('hidden'); });
+
+    // Build Sequence
+    $('build-seq-btn')?.addEventListener('click', () => { renderSeqTable(); showSeqModal(); });
+    $('seq-modal-close')?.addEventListener('click', hideSeqModal);
+    $('seq-cancel-btn')?.addEventListener('click', hideSeqModal);
+    $('seq-modal')?.addEventListener('click', e => { if (e.target === $('seq-modal')) hideSeqModal(); });
+    $('seq-add-btn')?.addEventListener('click', addSeqRow);
+    $('seq-clear-btn')?.addEventListener('click', clearSeq);
+    $('seq-apply-btn')?.addEventListener('click', applySeqAndClose);
+    $('seq-tbody')?.addEventListener('click', e => {
+        const btn = e.target.closest('.seq-del-btn');
+        if (btn) removeSeqRow(parseInt(btn.dataset.idx, 10));
+    });
+
+    // Parts List
+    $('rpt-parts-xlsx')?.addEventListener('click', () => { exportPartsXLSX(); $('reports-modal')?.classList.add('hidden'); });
+    $('rpt-parts-pdf')?.addEventListener('click', () => { exportPartsPDF(); $('reports-modal')?.classList.add('hidden'); });
+
+    // Production Schedule
+    $('rpt-sched-xlsx')?.addEventListener('click', () => { exportScheduleXLSX(); $('reports-modal')?.classList.add('hidden'); });
+    $('rpt-sched-pdf')?.addEventListener('click', () => { exportSchedulePDF(); $('reports-modal')?.classList.add('hidden'); });
+
+    // Machine Utilization
+    $('rpt-machine-xlsx')?.addEventListener('click', () => { exportMachineUtilXLSX(); $('reports-modal')?.classList.add('hidden'); });
+    $('rpt-machine-pdf')?.addEventListener('click', () => { exportMachineUtilPDF(); $('reports-modal')?.classList.add('hidden'); });
+
+    // Weekly Plan
+    $('rpt-weekly-xlsx')?.addEventListener('click', () => { exportWeeklyPlanXLSX(); $('reports-modal')?.classList.add('hidden'); });
+    $('rpt-weekly-pdf')?.addEventListener('click', () => { exportWeeklyPlanPDF(); $('reports-modal')?.classList.add('hidden'); });
+
+    // Executive Summary
+    $('rpt-summary-xlsx')?.addEventListener('click', () => { exportExecutiveSummaryXLSX(); $('reports-modal')?.classList.add('hidden'); });
+    $('rpt-summary-pdf')?.addEventListener('click', () => { exportExecutiveSummaryPDF(); $('reports-modal')?.classList.add('hidden'); });
 
     // ── NEW: Panel collapse ──────────────────────────────────
     document.querySelectorAll('.panel-collapse-btn').forEach(btn => {
@@ -2465,6 +3105,7 @@ async function switchBuilding(id) {
     appSettings = { ...DEFAULT_SETTINGS };
     ptSearch = ''; ptLoc = ''; ptStatus = ''; ptVeh = '';
     gSearch = ''; gMach = ''; gVeh = '';
+    prodSequence = [];
 
     // Clear filter UI
     const ps = $('parts-search'); if (ps) ps.value = '';
@@ -2475,6 +3116,7 @@ async function switchBuilding(id) {
     showLoading(`Loading ${BUILDING_NAMES[id] || 'Building #' + id}…`);
     await loadSettings();
     await loadShifts();
+    await loadProdSequence();
     await loadMachines();
     await loadAllPartsAndRebuild();
     hideLoading();
@@ -2498,6 +3140,7 @@ async function init() {
     }
     showLoading('Loading settings…'); await loadSettings();
     showLoading('Loading shifts…'); await loadShifts();
+    showLoading('Loading production sequence…'); await loadProdSequence();
     showLoading('Loading machines…'); await loadMachines();
     showLoading('Loading parts…'); await loadAllPartsAndRebuild();
     attachListeners();
