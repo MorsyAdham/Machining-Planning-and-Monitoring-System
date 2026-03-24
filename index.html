@@ -12,6 +12,7 @@
         href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@300;400;500&display=swap"
         rel="stylesheet" />
     <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="layout-modes.css" />
 </head>
 
 <body>
@@ -443,12 +444,16 @@
                         <span class="mf-hint">Must exactly match a configured Machine Type</span>
                     </div>
                     <div class="mf-field">
-                        <label>Status</label>
-                        <select id="part-edit-status">
-                            <option value="not_started">Not Started</option>
-                            <option value="in_progress">In Progress</option>
-                            <option value="complete">Complete</option>
+                        <label>Preferred Machine</label>
+                        <select id="part-edit-machine">
+                            <option value="">Auto-assign by machine type</option>
                         </select>
+                        <span class="mf-hint">Optional. Pick a specific machine like Noble 1 or Noble 2.</span>
+                    </div>
+                    <div class="mf-field">
+                        <label>Started Qty</label>
+                        <input type="number" id="part-edit-started" min="0" step="0.5" />
+                        <span class="mf-hint" id="part-edit-status-preview">Status: Not Started</span>
                     </div>
                     <div class="mf-field">
                         <label>Shift Preference</label>
@@ -547,155 +552,197 @@
             </div>
         </div>
 
-        <div class="hdr-battalion">
-            <span class="bat-pill k9">K9 <strong>×18</strong></span>
-            <span class="bat-div">/</span>
-            <span class="bat-pill k10">K10 <strong>×3</strong></span>
-            <span class="bat-div">/</span>
-            <span class="bat-pill k11">K11 <strong>×4</strong></span>
-            <span class="bat-div">—</span>
-            <span class="bat-total">25 vehicles</span>
-        </div>
-
-        <nav class="hdr-nav">
-
-            <!-- Settings -->
-            <div class="nav-dd" id="nav-dd-settings">
-                <button class="nav-btn" id="nav-dd-settings-btn" aria-expanded="false">
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <circle cx="12" cy="12" r="3" />
-                        <path
-                            d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83" />
-                    </svg>
-                    Settings
+        <nav class="app-navbar" aria-label="Primary navigation">
+            <div class="hdr-nav hdr-nav-primary">
+                <button class="workspace-nav-btn active" data-target="panel-overview">
+                    <span class="workspace-nav-text">
+                        <strong>Overview</strong>
+                        <small>Summary</small>
+                    </span>
                 </button>
-                <div class="dd-panel" id="nav-dd-settings-panel">
-                    <div class="dd-hdr"><span>Calendar &amp; Schedule</span><button class="dd-close">&times;</button>
-                    </div>
-                    <div class="dd-body">
-                        <form id="settings-form" novalidate>
-                            <div class="dd-field">
-                                <label>Plan Start Date</label>
-                                <input type="date" id="start-date" name="start_date" />
-                                <span class="dd-hint">First working day of production</span>
-                            </div>
-                            <div class="dd-field">
-                                <label>Working Day Start</label>
-                                <input type="time" id="day-start-time" name="day_start_time" value="08:00" />
-                            </div>
-                            <div class="dd-field">
-                                <label>Working Day End</label>
-                                <input type="time" id="day-end-time" name="day_end_time" value="17:00" />
-                            </div>
-                            <div class="dd-field">
-                                <label class="dd-chk-label">
-                                    <input type="checkbox" id="sat-working" name="saturday_working" />
-                                    <span>Saturday is a working day</span>
-                                </label>
-                                <span class="dd-hint">Sun–Thu always work &nbsp;·&nbsp; <strong
-                                        style="color:var(--err)">Friday never works</strong></span>
-                            </div>
-                            <div class="dd-field">
-                                <label>Op. Hours Unit</label>
-                                <select id="time-unit" name="time_unit">
-                                    <option value="h">Hours (e.g. 3.5 h)</option>
-                                    <option value="min">Minutes (e.g. 210 min)</option>
-                                </select>
-                                <span class="dd-hint">Set to <strong>Minutes</strong> if your data stores machining time
-                                    in minutes</span>
-                            </div>
-                            <button type="submit" class="btn btn-amber btn-block">✓ Save Settings</button>
-                        </form>
-                    </div>
-                </div>
+                <button class="workspace-nav-btn" data-target="panel-machines">
+                    <span class="workspace-nav-text">
+                        <strong>Machines</strong>
+                        <small>Capacity</small>
+                    </span>
+                </button>
+                <button class="workspace-nav-btn" data-target="panel-parts">
+                    <span class="workspace-nav-text">
+                        <strong>Parts</strong>
+                        <small>Data</small>
+                    </span>
+                </button>
+                <button class="workspace-nav-btn" data-target="panel-gantt">
+                    <span class="workspace-nav-text">
+                        <strong>Schedule</strong>
+                        <small>Timeline</small>
+                    </span>
+                </button>
             </div>
 
-            <!-- Shifts -->
-            <div class="nav-dd" id="nav-dd-shifts">
-                <button class="nav-btn" id="nav-dd-shifts-btn" aria-expanded="false">
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <circle cx="12" cy="12" r="10" />
-                        <polyline points="12 6 12 12 16 14" />
-                    </svg>
-                    Shifts
-                </button>
-                <div class="dd-panel dd-wide" id="nav-dd-shifts-panel">
-                    <div class="dd-hdr"><span>Shift Configuration</span><button class="dd-close">&times;</button></div>
-                    <div class="dd-body">
-                        <p class="dd-hint">Define shifts with operating hours and days. Assign machines to shifts.</p>
-                        <div id="shifts-config-wrap"><em class="dd-hint">Loading…</em></div>
-                        <button class="btn btn-outline btn-sm btn-block" id="add-shift-btn" style="margin-top:8px">+ Add
-                            / Edit Shift</button>
+            <div class="hdr-nav hdr-nav-actions">
+
+                <!-- Settings -->
+                <div class="nav-dd" id="nav-dd-settings">
+                    <button class="nav-btn" id="nav-dd-settings-btn" aria-expanded="false">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="3" />
+                            <path
+                                d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83" />
+                        </svg>
+                        Settings
+                    </button>
+                    <div class="dd-panel" id="nav-dd-settings-panel">
+                        <div class="dd-hdr"><span>Calendar &amp; Schedule</span><button class="dd-close">&times;</button>
+                        </div>
+                        <div class="dd-body">
+                            <form id="settings-form" novalidate>
+                                <div class="dd-field">
+                                    <label>Plan Start Date</label>
+                                    <input type="date" id="start-date" name="start_date" />
+                                    <span class="dd-hint">First working day of production</span>
+                                </div>
+                                <div class="dd-field">
+                                    <label>Working Day Start</label>
+                                    <input type="time" id="day-start-time" name="day_start_time" value="08:00" />
+                                </div>
+                                <div class="dd-field">
+                                    <label>Working Day End</label>
+                                    <input type="time" id="day-end-time" name="day_end_time" value="17:00" />
+                                </div>
+                                <div class="dd-field">
+                                    <label class="dd-chk-label">
+                                        <input type="checkbox" id="sat-working" name="saturday_working" />
+                                        <span>Saturday is a working day</span>
+                                    </label>
+                                    <span class="dd-hint">Sun–Thu always work &nbsp;·&nbsp; <strong
+                                            style="color:var(--err)">Friday never works</strong></span>
+                                </div>
+                                <div class="dd-field">
+                                    <label>Op. Hours Unit</label>
+                                    <select id="time-unit" name="time_unit">
+                                        <option value="h">Hours (e.g. 3.5 h)</option>
+                                        <option value="min">Minutes (e.g. 210 min)</option>
+                                    </select>
+                                    <span class="dd-hint">Set to <strong>Minutes</strong> if your data stores machining
+                                        time in minutes</span>
+                                </div>
+                                <div class="dd-field">
+                                    <label>System Layout</label>
+                                    <select id="system-layout" name="system_layout">
+                                        <option value="classic">Classic layout</option>
+                                        <option value="guided">Guided workspace</option>
+                                    </select>
+                                    <span class="dd-hint">Classic keeps the existing stacked workspace. Guided adds quick
+                                        navigation and grouped sections.</span>
+                                </div>
+                                <button type="submit" class="btn btn-amber btn-block">✓ Save Settings</button>
+                            </form>
+                        </div>
                     </div>
                 </div>
-            </div>
 
-            <!-- Data -->
-            <div class="nav-dd" id="nav-dd-data">
-                <button class="nav-btn" id="nav-dd-data-btn" aria-expanded="false">
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                        <polyline points="17 8 12 3 7 8" />
-                        <line x1="12" y1="3" x2="12" y2="15" />
-                    </svg>
-                    Data
-                </button>
-                <div class="dd-panel" id="nav-dd-data-panel">
-                    <div class="dd-hdr"><span>Data Management</span><button class="dd-close">&times;</button></div>
-                    <div class="dd-body">
-                        <p class="dd-hint">Download the template → fill <strong>Sheet 1</strong> → upload. Sheet 2
-                            explains every column.</p>
-                        <button class="btn btn-outline btn-block" id="download-template-btn">↓ Download Template
-                            (.xlsx)</button>
-                        <div class="dd-rule"></div>
-                        <label class="drop-zone" for="xlsx-upload" id="file-drop-zone">
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                stroke-width="1.5">
-                                <path d="M4 16v1a3 3 0 0 0 3 3h10a3 3 0 0 0 3-3v-1" />
-                                <polyline points="16 6 12 2 8 6" />
-                                <line x1="12" y1="2" x2="12" y2="15" />
-                            </svg>
-                            <span id="file-name-display">Drop .xlsx or .csv here, or click to browse</span>
-                        </label>
-                        <input type="file" id="xlsx-upload" accept=".xlsx,.xls,.csv" class="visually-hidden" />
-                        <button class="btn btn-teal btn-block" id="upload-btn" disabled>↑ Upload &amp; Process</button>
-                        <div class="dd-rule"></div>
-                        <div class="dd-stats">
-                            <div class="dd-stat"><span>Parts in DB</span><strong id="parts-db-count">—</strong></div>
-                            <div class="dd-stat"><span>Active</span><strong id="parts-active-count">—</strong></div>
-                            <div class="dd-stat"><span>Tasks</span><strong id="tasks-total-count">—</strong></div>
+                <!-- Shifts -->
+                <div class="nav-dd" id="nav-dd-shifts">
+                    <button class="nav-btn" id="nav-dd-shifts-btn" aria-expanded="false">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="10" />
+                            <polyline points="12 6 12 12 16 14" />
+                        </svg>
+                        Shifts
+                    </button>
+                    <div class="dd-panel dd-wide" id="nav-dd-shifts-panel">
+                        <div class="dd-hdr"><span>Shift Configuration</span><button class="dd-close">&times;</button></div>
+                        <div class="dd-body">
+                            <p class="dd-hint">Define shifts with operating hours and days. Assign machines to shifts.</p>
+                            <div id="shifts-config-wrap"><em class="dd-hint">Loading…</em></div>
+                            <button class="btn btn-outline btn-sm btn-block" id="add-shift-btn" style="margin-top:8px">+ Add
+                                / Edit Shift</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Data -->
+                <div class="nav-dd" id="nav-dd-data">
+                    <button class="nav-btn" id="nav-dd-data-btn" aria-expanded="false">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                            <polyline points="17 8 12 3 7 8" />
+                            <line x1="12" y1="3" x2="12" y2="15" />
+                        </svg>
+                        Data
+                    </button>
+                    <div class="dd-panel" id="nav-dd-data-panel">
+                        <div class="dd-hdr"><span>Data Management</span><button class="dd-close">&times;</button></div>
+                        <div class="dd-body">
+                            <p class="dd-hint">Download the template → fill <strong>Sheet 1</strong> → upload. Sheet 2
+                                explains every column.</p>
+                            <button class="btn btn-outline btn-block" id="download-template-btn">↓ Download Template
+                                (.xlsx)</button>
+                            <div class="dd-rule"></div>
+                            <label class="drop-zone" for="xlsx-upload" id="file-drop-zone">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="1.5">
+                                    <path d="M4 16v1a3 3 0 0 0 3 3h10a3 3 0 0 0 3-3v-1" />
+                                    <polyline points="16 6 12 2 8 6" />
+                                    <line x1="12" y1="2" x2="12" y2="15" />
+                                </svg>
+                                <span id="file-name-display">Drop .xlsx or .csv here, or click to browse</span>
+                            </label>
+                            <input type="file" id="xlsx-upload" accept=".xlsx,.xls,.csv" class="visually-hidden" />
+                            <button class="btn btn-teal btn-block" id="upload-btn" disabled>↑ Upload &amp; Process</button>
+                            <div class="dd-rule"></div>
+                            <div class="dd-stats">
+                                <div class="dd-stat"><span>Parts in DB</span><strong id="parts-db-count">—</strong></div>
+                                <div class="dd-stat"><span>Active</span><strong id="parts-active-count">—</strong></div>
+                                <div class="dd-stat"><span>Tasks</span><strong id="tasks-total-count">—</strong></div>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
-        </nav>
 
-        <div class="hdr-right">
-            <div class="conn-status" id="connection-status">
-                <span class="conn-dot" id="status-dot"></span>
-                <span id="status-text">Connecting…</span>
+            <div class="hdr-right">
+                <button id="theme-toggle-btn" class="btn-theme" title="Toggle theme" aria-label="Toggle theme">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="5" />
+                        <line x1="12" y1="1" x2="12" y2="3" />
+                        <line x1="12" y1="21" x2="12" y2="23" />
+                        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
+                        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+                        <line x1="1" y1="12" x2="3" y2="12" />
+                        <line x1="21" y1="12" x2="23" y2="12" />
+                        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
+                        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+                    </svg>
+                </button>
+                <label class="layout-picker" for="header-layout-select">
+                    <span>Layout</span>
+                    <select id="header-layout-select" aria-label="Choose system layout">
+                        <option value="classic">Classic</option>
+                        <option value="guided">Guided</option>
+                    </select>
+                </label>
             </div>
-            <button id="theme-toggle-btn" class="btn-theme" title="Toggle theme" aria-label="Toggle theme">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                    stroke-linecap="round" stroke-linejoin="round">
-                    <circle cx="12" cy="12" r="5" />
-                    <line x1="12" y1="1" x2="12" y2="3" />
-                    <line x1="12" y1="21" x2="12" y2="23" />
-                    <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
-                    <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
-                    <line x1="1" y1="12" x2="3" y2="12" />
-                    <line x1="21" y1="12" x2="23" y2="12" />
-                    <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
-                    <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
-                </svg>
-            </button>
-        </div>
+        </nav>
     </header>
     <div id="dd-backdrop" class="dd-backdrop hidden"></div>
 
     <!-- MAIN -->
     <main class="app-main">
-
+        <section class="workspace-subbar" aria-label="Workspace summary">
+            <div class="hdr-battalion">
+                <span class="bat-pill k9">K9 <strong>×18</strong></span>
+                <span class="bat-pill k10">K10 <strong>×3</strong></span>
+                <span class="bat-pill k11">K11 <strong>×4</strong></span>
+                <span class="bat-total">25 vehicles</span>
+            </div>
+            <div class="conn-status workspace-conn" id="connection-status-inline">
+                <span class="conn-dot" id="status-dot-inline"></span>
+                <span id="status-text-inline">Connecting…</span>
+            </div>
+        </section>
         <section class="panel panel-collapsible" id="panel-machines">
             <div class="panel-hdr">
                 <div class="panel-hdr-left">

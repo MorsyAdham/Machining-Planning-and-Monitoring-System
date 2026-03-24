@@ -13,6 +13,7 @@ const DEFAULT_SETTINGS = {
     day_start_time: '08:00',
     day_end_time: '17:00',
     time_unit: 'h',   // 'h' = hours (default), 'min' = minutes
+    system_layout: 'classic',
 };
 const FALLBACK_SHIFTS = [
     { id: 1, shift_number: 1, shift_name: 'Morning', start_time: '08:00', end_time: '16:00', active_days: [0, 1, 2, 3, 4], is_active: true },
@@ -71,6 +72,65 @@ function vehTags(p) {
     if (p.k10 && String(p.k10).trim().toUpperCase() === 'O') t.push('<span class="vt k10">K10</span>');
     if (p.k11 && String(p.k11).trim().toUpperCase() === 'O') t.push('<span class="vt k11">K11</span>');
     return t.join(' ') || '<span style="color:var(--tx3)">—</span>';
+}
+
+function getPartStatus(part) {
+    const remaining = flt(part?.remaining_qty);
+    const started = flt(part?.started_qty);
+    if (remaining <= 0) return 'complete';
+    if (started > 0) return 'in_progress';
+    return 'not_started';
+}
+
+function getPartStatusLabel(status) {
+    return ({ not_started: 'Not Started', in_progress: 'In Progress', complete: 'Complete' })[status] || status || 'Not Started';
+}
+
+function syncDerivedPartStatus(part) {
+    return { ...part, status: getPartStatus(part) };
+}
+
+function updatePartStatusPreview() {
+    const preview = $('part-edit-status-preview');
+    if (!preview) return;
+    const remaining = flt($('part-edit-remaining')?.value);
+    const started = flt($('part-edit-started')?.value);
+    const status = getPartStatus({ remaining_qty: remaining, started_qty: started });
+    preview.textContent = `Status: ${getPartStatusLabel(status)}`;
+}
+
+const SYSTEM_LAYOUT_KEY = 'b1_system_layout';
+
+function normalizeSystemLayout(layout) {
+    return layout === 'guided' ? 'guided' : 'classic';
+}
+
+function getSystemLayoutStorageKey(buildingId = activeBuildingId) {
+    return `${SYSTEM_LAYOUT_KEY}_${buildingId}`;
+}
+
+function loadStoredSystemLayout(buildingId = activeBuildingId) {
+    try {
+        return normalizeSystemLayout(localStorage.getItem(getSystemLayoutStorageKey(buildingId)));
+    } catch (e) {
+        return DEFAULT_SETTINGS.system_layout;
+    }
+}
+
+function syncLayoutControls(layout) {
+    const normalized = normalizeSystemLayout(layout);
+    if ($('system-layout')) $('system-layout').value = normalized;
+    if ($('header-layout-select')) $('header-layout-select').value = normalized;
+}
+
+function applySystemLayout(layout, { persist = true } = {}) {
+    const normalized = normalizeSystemLayout(layout);
+    document.body.setAttribute('data-system-layout', normalized);
+    appSettings = { ...appSettings, system_layout: normalized };
+    syncLayoutControls(normalized);
+    if (persist) {
+        try { localStorage.setItem(getSystemLayoutStorageKey(), normalized); } catch (e) { }
+    }
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -215,6 +275,7 @@ function expandPart(part) {
         partName: String(part.part_name || '').trim(),
         opHrs,
         machineType: String(part.location || 'Unknown').trim(),
+        preferredMachineId: part.preferred_machine_id != null ? parseInt(part.preferred_machine_id, 10) : null,
         sortOrder: parseInt(part.sort_order, 10) || 0,
     };
 
@@ -311,6 +372,7 @@ function scheduleParts(parts, machines) {
                     partName: String(part.part_name || '').trim(),
                     opHrs: flt(part.op_hrs),
                     machineType: String(part.location || 'Unknown').trim(),
+                    preferredMachineId: part.preferred_machine_id != null ? parseInt(part.preferred_machine_id, 10) : null,
                     sortOrder: 0,
                     vehicle,
                     unitIndex: globalUnitIdx,
@@ -352,8 +414,22 @@ function scheduleParts(parts, machines) {
         const pool = byType[task.machineType];
         if (!pool || !pool.length) return;
 
-        // Choose least-loaded machine (by available day, not hours)
-        const chosen = pool.reduce((best, m) => avail[m.id] < avail[best.id] ? m : best, pool[0]);
+        let candidatePool = pool;
+
+        // If a specific machine is requested, restrict scheduling to that machine
+        if (task.preferredMachineId != null) {
+            candidatePool = pool.filter(m => String(m.id) === String(task.preferredMachineId));
+            if (!candidatePool.length) {
+                // Preferred machine either does not exist, is inactive, or its type does not match
+                return;
+            }
+        }
+
+        // Choose least-loaded machine from the allowed pool
+        const chosen = candidatePool.reduce(
+            (best, m) => avail[m.id] < avail[best.id] ? m : best,
+            candidatePool[0]
+        );
         const daily = mDailyForMachine(chosen);
         // barDays: fractional days this task occupies (used for bar width AND queue advancement)
         // No minimum-1-day floor here — a 3.5h task on an 8h/day machine = 0.4375 days,
@@ -588,10 +664,12 @@ async function loadSettings() {
         if (error) throw error;
         if (data) appSettings = { ...DEFAULT_SETTINGS, ...data };
     } catch (e) { appSettings = { ...DEFAULT_SETTINGS }; }
+    appSettings.system_layout = normalizeSystemLayout(appSettings.system_layout || loadStoredSystemLayout(activeBuildingId));
     populateSettingsForm();
 }
 
 async function saveSettings(fd) {
+    const systemLayout = normalizeSystemLayout(fd.get('system_layout'));
     const s = {
         id: activeBuildingId,
         building_id: activeBuildingId,
@@ -600,6 +678,7 @@ async function saveSettings(fd) {
         day_start_time: fd.get('day_start_time') || '08:00',
         day_end_time: fd.get('day_end_time') || '17:00',
         time_unit: fd.get('time_unit') || 'h',
+        system_layout: systemLayout,
         updated_at: new Date().toISOString(),
     };
     try {
@@ -611,6 +690,7 @@ async function saveSettings(fd) {
         appSettings = { ...s };
         showToast('Applied locally', 'info');
     }
+    applySystemLayout(systemLayout);
     rebuildPlan();
 }
 
@@ -620,6 +700,9 @@ function populateSettingsForm() {
     if ($('day-start-time')) $('day-start-time').value = appSettings.day_start_time || '08:00';
     if ($('day-end-time')) $('day-end-time').value = appSettings.day_end_time || '17:00';
     if ($('time-unit')) $('time-unit').value = appSettings.time_unit || 'h';
+    if ($('system-layout')) $('system-layout').value = normalizeSystemLayout(appSettings.system_layout);
+    if ($('header-layout-select')) $('header-layout-select').value = normalizeSystemLayout(appSettings.system_layout);
+    applySystemLayout(appSettings.system_layout, { persist: false });
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -918,9 +1001,9 @@ function closeMachModal() { $('machine-modal').classList.add('hidden'); }
 ═══════════════════════════════════════════════════════════════ */
 function downloadTemplate() {
     const XLSX = window.XLSX; if (!XLSX) { showToast('SheetJS not ready', 'error'); return; }
-    const hdr = ['part_number', 'part_name', 'setup_hrs', 'mach_hrs', 'op_hrs', 'k9', 'k10', 'k11', 'battalion_qty', 'remaining_qty', 'location'];
+    const hdr = ['part_number', 'part_name', 'setup_hrs', 'mach_hrs', 'op_hrs', 'k9', 'k10', 'k11', 'battalion_qty', 'remaining_qty', 'started_qty', 'location'];
     const ws1 = XLSX.utils.aoa_to_sheet([hdr]);
-    ws1['!cols'] = [{ wch: 20 }, { wch: 32 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 6 }, { wch: 6 }, { wch: 6 }, { wch: 16 }, { wch: 16 }, { wch: 20 }];
+    ws1['!cols'] = [{ wch: 20 }, { wch: 32 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 6 }, { wch: 6 }, { wch: 6 }, { wch: 16 }, { wch: 16 }, { wch: 16 }, { wch: 20 }];
     const ws2 = XLSX.utils.aoa_to_sheet([
         ['Building #1 Parts Template', '', ''], ['', '', ''],
         ['Column', 'Required?', 'Notes'],
@@ -931,6 +1014,7 @@ function downloadTemplate() {
         ['k10', 'No', 'Write O if K10 (3 total). Leave blank otherwise.'],
         ['k11', 'No', 'Write O if K11 (4 total). Leave blank otherwise.'],
         ['remaining_qty', 'YES', 'Units still left to machine. Decimal values allowed (e.g. 7.5).'],
+        ['started_qty', 'No', 'Units already started. Leave blank or 0 for not started.'],
         ['location', 'YES', 'Machine TYPE. Must exactly match a Machine Type configured in the app.'],
         ['', '', ''], ['RULES', '', ''],
         ['1', '', 'remaining_qty = 0 or blank → row skipped.'],
@@ -995,6 +1079,7 @@ function normalizeRow(raw) {
         return '';
     }
     const remRaw = get('remaining_qty', 'remaining qty', 'remainingqty', 'remaining', 'qty_remaining', 'left', 'balance');
+    const startedRaw = get('started_qty', 'started qty', 'startedqty', 'qty_started', 'started');
     return {
         part_number: get('part_number', 'part number', 'partnumber', 'part_no', 'partno', 'p_n', 'pn'),
         part_name: get('part_name', 'part name', 'partname', 'description', 'name', 'desc'),
@@ -1006,6 +1091,7 @@ function normalizeRow(raw) {
         k11: get('k11', 'k 11') || null,
         battalion_qty: flt(get('battalion_qty', 'battalion qty', 'battalion')),
         remaining_qty: parseFloat(remRaw || 0) || 0,
+        started_qty: parseFloat(startedRaw || 0) || 0,
         location: get('location', 'machine_type', 'machine type', 'machine', 'loc'),
         building_id: activeBuildingId,
         status: 'not_started', shift_preference: null, k9_qty: null, k10_qty: null, k11_qty: null,
@@ -1020,8 +1106,8 @@ async function loadAllPartsAndRebuild() {
     try {
         const { data, error } = await db.from('building1_parts').select('*').eq('building_id', activeBuildingId).order('sort_order').order('id');
         if (error) throw error;
-        allParts = data || [];
-        currentParts = allParts.filter(p => flt(p.remaining_qty) > 0 && p.status !== 'complete');
+        allParts = (data || []).map(syncDerivedPartStatus);
+        currentParts = allParts.filter(p => flt(p.remaining_qty) > 0);
     } catch (err) {
         allParts = []; currentParts = [];
         showToast('Could not load parts', 'error');
@@ -1100,7 +1186,7 @@ function getFilteredParts() {
         const q = ptSearch.toLowerCase();
         if (q && !String(p.part_number).toLowerCase().includes(q) && !String(p.part_name).toLowerCase().includes(q)) return false;
         if (ptLoc && String(p.location).toLowerCase() !== ptLoc.toLowerCase()) return false;
-        if (ptStatus && p.status !== ptStatus) return false;
+        if (ptStatus && getPartStatus(p) !== ptStatus) return false;
         if (ptVeh && !(p[ptVeh.toLowerCase()] && String(p[ptVeh.toLowerCase()]).trim().toUpperCase() === 'O')) return false;
         return true;
     });
@@ -1116,13 +1202,14 @@ function renderPartsTable() {
     const cnt = $('parts-count'); if (cnt) cnt.textContent = `${rows.length} of ${allParts.length} parts`;
     if (!rows.length) { wrap.innerHTML = '<div class="empty-state"><em>No parts match the current filters.</em></div>'; return; }
 
-    const SL = { not_started: 'Not Started', in_progress: 'In Progress', complete: 'Complete' };
     const isMin = (appSettings.time_unit || 'h') === 'min';
     const trs = rows.map((p, idx) => {
+        const partStatus = getPartStatus(p);
         const rawOp = flt(p.op_hrs);
         const rawTot = rawOp * flt(p.remaining_qty);
         const dispOp = isMin ? `${rawOp.toFixed(0)} min` : `${rawOp.toFixed(2)} h`;
         const dispTot = isMin ? `${rawTot.toFixed(0)} min` : `${rawTot.toFixed(2)} h`;
+        const startedQty = flt(p.started_qty);
         const sp = p.shift_preference ? `<span class="shift-badge">S${p.shift_preference}</span>` : '';
         const hasUnitOvs = Array.isArray(p.unit_overrides) && p.unit_overrides.length > 0;
         const hasManual = p.k9_qty != null || p.k10_qty != null || p.k11_qty != null;
@@ -1131,7 +1218,7 @@ function renderPartsTable() {
         else if (hasManual) distCell = `<span class="dist-split">K9:${flt(p.k9_qty) || 0} K10:${flt(p.k10_qty) || 0} K11:${flt(p.k11_qty) || 0}</span>`;
         else distCell = '<span class="dist-auto">Auto</span>';
         const td = p.target_date ? `<span class="target-date-badge">${p.target_date}</span>` : '';
-        return `<tr class="${p.status === 'complete' ? 'row-done' : ''}" data-pid="${p.id}">
+        return `<tr class="${partStatus === 'complete' ? 'row-done' : ''}" data-pid="${p.id}">
       <td><div class="order-btns">
         <button class="btn-order" data-act="up" data-pid="${p.id}">▲</button>
         <button class="btn-order" data-act="dn" data-pid="${p.id}">▼</button>
@@ -1143,16 +1230,17 @@ function renderPartsTable() {
       <td>${vehTags(p)}</td>
       <td>${distCell}${td}</td>
       <td class="num-r">${flt(p.remaining_qty)}</td>
+      <td class="num-r">${startedQty}</td>
       <td class="num-r">${dispOp}</td>
       <td class="num-acc">${dispTot}</td>
-      <td>${sp}<span class="sb sb-${p.status}">${SL[p.status] || p.status}</span></td>
+      <td>${sp}<span class="sb sb-${partStatus}">${getPartStatusLabel(partStatus)}</span></td>
       <td><button class="btn-tbl btn-tbl-e" data-act="editpart" data-pid="${p.id}">Edit</button></td>
     </tr>`;
     }).join('');
 
     wrap.innerHTML = `<table class="parts-table"><thead><tr>
     <th>Order</th><th>#</th><th>Location</th><th>Part Number</th><th>Part Name</th><th>Vehicles</th>
-    <th>Distribution</th><th class="num-r">Remaining</th>
+    <th>Distribution</th><th class="num-r">Remaining</th><th class="num-r">Started</th>
     <th class="num-r">Op ${isMin ? 'Min' : 'Hrs'}/Unit</th>
     <th class="num-acc">Total ${isMin ? 'Min' : 'Hrs'}</th>
     <th>Status</th><th>Actions</th>
@@ -1174,7 +1262,7 @@ async function onReorder(e) {
     allParts[idx] = { ...a, sort_order: soB };
     allParts[swapIdx] = { ...b, sort_order: soA };
     allParts.sort((x, y) => x.sort_order - y.sort_order);
-    currentParts = allParts.filter(p => flt(p.remaining_qty) > 0 && p.status !== 'complete');
+    currentParts = allParts.filter(p => flt(p.remaining_qty) > 0);
     renderPartsTable();
     try {
         await Promise.all([
@@ -1205,7 +1293,10 @@ function openPartModal(partId) {
     const pmTitle = $('part-modal-title'); if (pmTitle) pmTitle.textContent = isAdd ? 'Add New Part' : 'Edit Part';
     if ($('part-edit-id')) $('part-edit-id').value = isAdd ? '' : p.id;
     const pmDel = $('part-modal-delete'); if (pmDel) pmDel.style.display = isAdd ? 'none' : '';
-
+    populatePreferredMachineSelect(
+    p?.location || '',
+    p?.preferred_machine_id ?? null
+);
     // Add-mode fields
     const addFields = $('pm-add-fields');
     if (addFields) addFields.classList.toggle('hidden', !isAdd);
@@ -1229,7 +1320,7 @@ function openPartModal(partId) {
 
     // Core fields
     $('part-edit-location').value = isAdd ? '' : p.location || '';
-    $('part-edit-status').value = isAdd ? 'not_started' : p.status || 'not_started';
+    $('part-edit-started').value = isAdd ? '0' : flt(p.started_qty);
     $('part-edit-shift').value = isAdd ? '' : p.shift_preference || '';
     $('part-edit-remaining').value = isAdd ? '' : flt(p.remaining_qty);
     $('part-edit-op-hrs').value = isAdd ? '' : flt(p.op_hrs);
@@ -1246,6 +1337,7 @@ function openPartModal(partId) {
     $('part-edit-k11qty').value = isAdd ? '' : toVal(p.k11_qty);
 
     updateDistSum();
+    updatePartStatusPreview();
     refreshUnitSchedule(p);
     $('part-modal').classList.remove('hidden');
 }
@@ -1305,7 +1397,9 @@ async function savePartFromModal() {
     if (isAdd && !partName) { showToast('Part Name required', 'error'); return; }
 
     const location = $('part-edit-location').value.trim();
-    const status = $('part-edit-status').value;
+    const preferredMachineRaw = $('part-edit-machine')?.value || '';
+    const preferredMachineId = preferredMachineRaw ? parseInt(preferredMachineRaw, 10) : null;
+    const started = parseFloat($('part-edit-started')?.value) || 0;
     const shiftRaw = $('part-edit-shift').value;
     const shift = shiftRaw ? parseInt(shiftRaw, 10) : null;
     const remaining = parseFloat($('part-edit-remaining').value) || 0;
@@ -1320,6 +1414,9 @@ async function savePartFromModal() {
     const k11q = k11v !== '' ? parseFloat(k11v) : null;
 
     if (!location) { showToast('Location / Machine Type required', 'error'); return; }
+    if (started < 0) { showToast('Started Qty cannot be negative', 'error'); return; }
+
+    const status = getPartStatus({ remaining_qty: remaining, started_qty: started });
 
     if (k9v !== '' || k10v !== '' || k11v !== '') {
         const sum = (k9q || 0) + (k10q || 0) + (k11q || 0);
@@ -1335,7 +1432,8 @@ async function savePartFromModal() {
             const { error } = await db.from('building1_parts').insert({
                 part_number: partNumber, part_name: partName,
                 k9: k9Flag, k10: k10Flag, k11: k11Flag, battalion_qty: batQty || 0,
-                location, status, remaining_qty: remaining, op_hrs: opHrs,
+                location, status, remaining_qty: remaining, started_qty: started, op_hrs: opHrs,
+                preferred_machine_id: preferredMachineId,
                 shift_preference: shift, k9_qty: k9q, k10_qty: k10q, k11_qty: k11q,
                 unit_overrides: unitOverrides, target_date: targetDate,
                 sort_order: nextOrder, building_id: activeBuildingId,
@@ -1344,7 +1442,8 @@ async function savePartFromModal() {
             showToast('Part added ✓', 'success');
         } else {
             const { error } = await db.from('building1_parts').update({
-                location, status, remaining_qty: remaining, op_hrs: opHrs,
+                location, status, remaining_qty: remaining, started_qty: started, op_hrs: opHrs,
+                preferred_machine_id: preferredMachineId,
                 shift_preference: shift, k9_qty: k9q, k10_qty: k10q, k11_qty: k11q,
                 unit_overrides: unitOverrides, target_date: targetDate,
             }).eq('id', parseInt(id, 10));
@@ -1371,6 +1470,35 @@ async function deleteCurrentPart() {
         showToast('Part deleted', 'success');
     } catch (err) { showToast('Delete failed: ' + err.message, 'error'); }
     finally { hideLoading(); }
+}
+
+function populatePreferredMachineSelect(machineType, selectedId = null) {
+    const sel = $('part-edit-machine');
+    if (!sel) return;
+
+    const type = String(machineType || '').trim().toLowerCase();
+    const activeMachines = (currentMachines || [])
+        .filter(m => m.is_active)
+        .sort((a, b) => {
+            const typeCmp = String(a.machine_type || '').localeCompare(String(b.machine_type || ''));
+            if (typeCmp !== 0) return typeCmp;
+            return String(a.name || '').localeCompare(String(b.name || ''));
+        });
+    const matching = type
+        ? activeMachines.filter(m => String(m.machine_type || '').trim().toLowerCase() === type)
+        : activeMachines;
+    const optionsSource = matching.length ? matching : activeMachines;
+
+    sel.innerHTML = '<option value="">Auto-assign by machine type</option>' +
+        optionsSource.map(m => {
+            const machineTypeLabel = String(m.machine_type || '').trim();
+            const label = machineTypeLabel ? `${m.name} (${machineTypeLabel})` : String(m.name || '');
+            return `<option value="${m.id}">${esc(label)}</option>`;
+        }).join('');
+
+    const selectedValue = selectedId != null ? String(selectedId) : '';
+    sel.value = optionsSource.some(m => String(m.id) === selectedValue) ? selectedValue : '';
+    sel.disabled = !activeMachines.length;
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -2137,16 +2265,17 @@ function exportPartsPDF() {
 
     const doc = _makePdfDoc(`Building #${activeBuildingId} — Parts List`);
 
-    const cols = ['Part Number', 'Part Name', 'Location', 'K9', 'K10', 'K11', 'Rem. QTY', unitCol, totCol, 'Status', 'Target Date'];
+    const cols = ['Part Number', 'Part Name', 'Location', 'K9', 'K10', 'K11', 'Rem. QTY', 'Started QTY', unitCol, totCol, 'Status', 'Target Date'];
     const rows = [];
     (currentParts || allParts || []).forEach(p => {
         rows.push([
             p.part_number || '', p.part_name || '', p.location || '',
             p.k9 ? '●' : '', p.k10 ? '●' : '', p.k11 ? '●' : '',
             String(flt(p.remaining_qty)),
+            String(flt(p.started_qty)),
             String(flt(p.op_hrs)),
             String(+(flt(p.op_hrs) * flt(p.remaining_qty)).toFixed(2)),
-            p.status || '', p.target_date || '',
+            getPartStatusLabel(getPartStatus(p)), p.target_date || '',
         ]);
     });
 
@@ -2749,6 +2878,7 @@ function exportPartsXLSX() {
         { title: 'Location / Machine', width: 20 },
         { title: 'K9', width: 6 }, { title: 'K10', width: 6 }, { title: 'K11', width: 6 },
         { title: 'Rem. QTY', width: 12, align: 'right' },
+        { title: 'Started QTY', width: 12, align: 'right' },
         { title: unitCol, width: 14, align: 'right' },
         { title: totCol, width: 14, align: 'right' },
         { title: 'Batt. QTY', width: 12, align: 'right' },
@@ -2787,10 +2917,11 @@ function exportPartsXLSX() {
                 p.part_number || '', p.part_name || '', p.location || '',
                 p.k9 ? '●' : '', p.k10 ? '●' : '', p.k11 ? '●' : '',
                 flt(p.remaining_qty),
+                flt(p.started_qty),
                 flt(p.op_hrs),
                 +(flt(p.op_hrs) * flt(p.remaining_qty)).toFixed(2),
                 p.battalion_qty || 0,
-                p.status || '',
+                getPartStatusLabel(getPartStatus(p)),
                 p.shift_preference ? 'S' + p.shift_preference : '',
                 p.k9_qty != null ? flt(p.k9_qty) : '',
                 p.k10_qty != null ? flt(p.k10_qty) : '',
@@ -2868,9 +2999,14 @@ function showLoading(msg = 'Loading…') {
 function hideLoading() { const o = $('loading-overlay'); if (o) o.classList.add('hidden'); }
 function setConn(ok) {
     isOK = ok;
-    const dot = $('status-dot'), txt = $('status-text');
-    if (dot) dot.className = 'conn-dot ' + (ok ? 'connected' : 'disconnected');
-    if (txt) txt.textContent = ok ? 'Connected' : 'Not Connected';
+    ['status-dot', 'status-dot-inline'].forEach(id => {
+        const dot = $(id);
+        if (dot) dot.className = 'conn-dot ' + (ok ? 'connected' : 'disconnected');
+    });
+    ['status-text', 'status-text-inline'].forEach(id => {
+        const txt = $(id);
+        if (txt) txt.textContent = ok ? 'Connected' : 'Not Connected';
+    });
 }
 function updateLastUpdated() {
     const el = $('last-updated');
@@ -2909,21 +3045,64 @@ function applyTheme(t) {
 function toggleTheme() { applyTheme(document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark'); }
 function loadTheme() { let t = 'dark'; try { t = localStorage.getItem(THEME_KEY) || 'dark'; } catch (e) { } applyTheme(t); }
 
+function setActiveWorkspaceNav(targetId) {
+    document.querySelectorAll('.workspace-nav-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.target === targetId);
+    });
+}
+
+function initWorkspaceNav() {
+    const navButtons = Array.from(document.querySelectorAll('.workspace-nav-btn'));
+    if (!navButtons.length) return;
+
+    navButtons.forEach(btn => {
+        btn.addEventListener('click', () => {
+            const target = document.getElementById(btn.dataset.target);
+            if (!target) return;
+            setActiveWorkspaceNav(btn.dataset.target);
+            target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        });
+    });
+
+    if (!('IntersectionObserver' in window)) return;
+    const observer = new IntersectionObserver(entries => {
+        const visible = entries
+            .filter(entry => entry.isIntersecting)
+            .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
+        if (visible?.target?.id) setActiveWorkspaceNav(visible.target.id);
+    }, {
+        rootMargin: '-18% 0px -55% 0px',
+        threshold: [0.2, 0.35, 0.5]
+    });
+
+    ['panel-overview', 'panel-machines', 'panel-parts', 'panel-gantt'].forEach(id => {
+        const panel = $(id);
+        if (panel) observer.observe(panel);
+    });
+}
+
 /* ═══════════════════════════════════════════════════════════════
    25 · EVENT LISTENERS
 ═══════════════════════════════════════════════════════════════ */
 function attachListeners() {
     initGanttViewSwitcher();
+    initWorkspaceNav();
     // Building switcher
     document.querySelectorAll('.bld-tab').forEach(btn => {
         btn.addEventListener('click', () => switchBuilding(parseInt(btn.dataset.bid, 10)));
     });
     $('theme-toggle-btn')?.addEventListener('click', toggleTheme);
+    $('header-layout-select')?.addEventListener('change', e => {
+        applySystemLayout(e.target.value);
+    });
 
     // Settings form
     $('settings-form')?.addEventListener('submit', async e => {
         e.preventDefault(); showLoading('Saving…');
         await saveSettings(new FormData(e.target)); hideLoading();
+    });
+    $('system-layout')?.addEventListener('change', e => {
+        applySystemLayout(e.target.value);
     });
 
     // Machine modal
@@ -2955,7 +3134,13 @@ function attachListeners() {
     $('add-part-btn')?.addEventListener('click', () => openPartModal(null));
 
     $('part-edit-remaining')?.addEventListener('input', () => {
-        updateDistSum(); refreshUnitSchedule(currentEditPart);
+        updateDistSum(); updatePartStatusPreview(); refreshUnitSchedule(currentEditPart);
+    });
+    $('part-edit-started')?.addEventListener('input', () => {
+        updatePartStatusPreview();
+    });
+    $('part-edit-location')?.addEventListener('input', e => {
+        populatePreferredMachineSelect(e.target.value, null);
     });
     ['part-edit-k9qty', 'part-edit-k10qty', 'part-edit-k11qty'].forEach(id => {
         $(id)?.addEventListener('input', updateDistSum);
@@ -3159,6 +3344,7 @@ const BUILDING_SHORT = { 1: '#1', 2: '#2' };
 async function switchBuilding(id) {
     if (id === activeBuildingId) return;
     activeBuildingId = id;
+    applySystemLayout(loadStoredSystemLayout(id), { persist: false });
 
     // Update UI
     document.querySelectorAll('.bld-tab').forEach(b => {
@@ -3194,6 +3380,7 @@ async function switchBuilding(id) {
 
 async function init() {
     loadTheme();
+    applySystemLayout(loadStoredSystemLayout(activeBuildingId), { persist: false });
     initDropdowns();
     showLoading('Connecting to database…');
     try {
