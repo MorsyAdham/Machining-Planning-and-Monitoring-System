@@ -1534,37 +1534,54 @@ function fmtOp(v) {
 }
 
 // Build rich tooltip HTML for a task
-function tooltipHTML(t) {
+// Optional opts: { unitTotal (total units of this part on this machine), seqNum, taskIdx/totalTasks }
+function tooltipHTML(t, opts = {}) {
     const sd = addWD(appSettings.start_date, Math.floor(t.startDay), appSettings);
     // endDay is fractional — use ceiling to get the calendar day the task finishes on
     const endDayCeil = Math.ceil(t.endDay);
     const ed = addWD(appSettings.start_date, endDayCeil > Math.floor(t.startDay) ? endDayCeil - 1 : endDayCeil, appSettings);
     const vm = VMETA[t.vehicle] || { cls: 'k9' };
-    return `<div class="gt-head">
-    <span class="gt-veh-pill ${vm.cls}">${t.vehicle}${t.unitIndex ? ` · U${t.unitIndex}` : ''}</span>
-    <span class="gt-pn">${esc(t.partNumber)}</span>
-  </div>
-  <div class="gt-body">
-    <div class="gt-name">${esc(t.partName)}</div>
-    <div class="gt-rows">
-      <div class="gt-row"><span class="gt-row-label">Machine</span><span class="gt-row-value">${esc(t.machineName)}</span></div>
-      <div class="gt-row"><span class="gt-row-label">Start</span><span class="gt-row-value">${fmtDate(sd)}</span></div>
-      <div class="gt-row"><span class="gt-row-label">End</span><span class="gt-row-value">${fmtDate(ed)}</span></div>
-      <div class="gt-row"><span class="gt-row-label">Op Hrs</span><span class="gt-row-value">${fmtOp(t.opHrs * (unitLabel() === 'min' ? 60 : 1))}</span></div>
-      ${t.shiftPref ? `<div class="gt-row"><span class="gt-row-label">Shift</span><span class="gt-row-value">Shift ${t.shiftPref}</span></div>` : ''}
-      ${t.pinnedDate ? `<div class="gt-row"><span class="gt-row-label">📌 Pinned</span><span class="gt-row-value">${t.pinnedDate}</span></div>` : ''}
-    </div>
-  </div>`;
+
+    // Calculate duration info
+    const calendarDays = Math.ceil(t.endDay) - Math.floor(t.startDay);
+    const durationLabel = calendarDays === 1 ? '1 day' : `${calendarDays} days`;
+
+    // Unit info
+    const unitText = t.unitIndex && opts.unitTotal
+        ? `U${t.unitIndex}/${opts.unitTotal}`
+        : (t.unitIndex ? `U${t.unitIndex}` : '');
+
+    // Sequence badge
+    const seqBadge = t.seqNum
+        ? `<span class="gt-seq">#${t.seqNum}</span>`
+        : '';
+
+    // Machine utilization for this task (what % of the day(s) it occupies)
+    const utilization = t.dailyHours > 0
+        ? Math.min(100, Math.round((t.opHrs / (t.dailyHours * Math.max(1, t.barDays))) * 100))
+        : 0;
+    const utilColor = utilization > 85 ? 'var(--err)' : utilization > 50 ? 'var(--warn)' : 'var(--ok)';
+
+    // Build compact single-line HTML for data-tip attribute
+    const head = `<div class="gt-head"><span class="gt-veh-pill ${vm.cls}">${t.vehicle}${unitText ? ` · ${unitText}` : ''}</span><span class="gt-pn">${esc(t.partNumber)}</span>${seqBadge}</div>`;
+    const rows = [
+        `<div class="gt-row"><span class="gt-row-label">Machine</span><span class="gt-row-value">${esc(t.machineName)}</span></div>`,
+        `<div class="gt-row"><span class="gt-row-label">Schedule</span><span class="gt-row-value">${fmtDate(sd)} → ${fmtDate(ed)}</span></div>`,
+        `<div class="gt-row"><span class="gt-row-label">Duration</span><span class="gt-row-value">${durationLabel} · ${fmtOp(t.opHrs * (unitLabel() === 'min' ? 60 : 1))}</span></div>`,
+        `<div class="gt-row"><span class="gt-row-label">Load</span><span class="gt-row-value" style="color:${utilColor}">${utilization}%</span></div>`,
+        t.shiftPref ? `<div class="gt-row"><span class="gt-row-label">Shift</span><span class="gt-row-value">Shift ${t.shiftPref}</span></div>` : '',
+        t.pinnedDate ? `<div class="gt-row"><span class="gt-row-label">📌 Pinned</span><span class="gt-row-value">${t.pinnedDate}</span></div>` : ''
+    ].filter(Boolean).join('');
+    const body = `<div class="gt-body"><div class="gt-name">${esc(t.partName)}</div><div class="gt-rows">${rows}</div></div>`;
+    return head + body;
 }
 
-// Attach tooltip listeners to all .tb and .unit-tick elements in a container
+// Attach tooltip listeners to all .tb, .unit-tick, .wk-cell-wrap, and .part-span-bar elements in a container
 function attachTooltips(container) {
     const tt = $('gantt-tooltip'); if (!tt) return;
-    const bars = container.querySelectorAll('.tb[data-tip], .unit-tick[data-tip], .wk-cell-wrap[data-tip]');
-    console.log('[debug] attachTooltips: found', bars.length, 'elements with data-tip');
+    const bars = container.querySelectorAll('.tb[data-tip], .unit-tick[data-tip], .wk-cell-wrap[data-tip], .part-span-bar[data-tip]');
     bars.forEach(bar => {
         bar.addEventListener('mouseenter', e => {
-            console.log('[debug] hover on', bar.className, '→ tip:', bar.dataset.tip ? bar.dataset.tip.slice(0, 60) : 'EMPTY');
             tt.innerHTML = bar.dataset.tip || '';
             tt.classList.remove('hidden');
             positionTooltip(e, tt);
@@ -1575,10 +1592,15 @@ function attachTooltips(container) {
 }
 
 function positionTooltip(e, tt) {
-    const margin = 12, W = tt.offsetWidth || 260, H = tt.offsetHeight || 140;
+    const margin = 12, pad = 8;
+    // Force layout calculation for accurate dimensions
+    const W = tt.offsetWidth || 260, H = tt.offsetHeight || 140;
     let x = e.clientX + margin, y = e.clientY + margin;
-    if (x + W > window.innerWidth - 8) x = e.clientX - W - margin;
-    if (y + H > window.innerHeight - 8) y = e.clientY - H - margin;
+    // Keep within viewport bounds
+    if (x + W > window.innerWidth - pad) x = e.clientX - W - margin;
+    if (y + H > window.innerHeight - pad) y = e.clientY - H - margin;
+    if (x < pad) x = pad;
+    if (y < pad) y = pad;
     tt.style.left = (x + window.scrollX) + 'px';
     tt.style.top = (y + window.scrollY) + 'px';
 }
@@ -1663,6 +1685,14 @@ function renderMachineView(tasks, c) {
             const util = maxEnd > 0 ? Math.min(100, Math.round((totalHrs / (maxEnd * daily)) * 100)) : 0;
             const utilColor = util > 85 ? 'var(--err)' : util > 65 ? 'var(--warn)' : 'var(--ok)';
 
+            // Count units per part for this machine (for tooltip "U3/12" display)
+            const partUnitCounts = {};
+            mTasks.forEach(t => {
+                const key = t.partNumber;
+                if (!partUnitCounts[key]) partUnitCounts[key] = 0;
+                partUnitCounts[key]++;
+            });
+
             const bars = mTasks.map(t => {
                 const barL = t.startDay * DW;
                 // Use fractional barDays for pixel-accurate width — shows real proportion of the day
@@ -1670,9 +1700,10 @@ function renderMachineView(tasks, c) {
                 const vm = VMETA[t.vehicle] || { cls: 'k9' };
                 // Show part number when bar is wide enough; never show vehicle type as fallback
                 const label = barW > 32 ? t.partNumber : '';
+                const unitTotal = partUnitCounts[t.partNumber] || 0;
                 return `<div class="tb tb-${vm.cls}${t.pinnedDate ? ' tb-pinned' : ''}"
           style="left:${barL.toFixed(1)}px;width:${barW.toFixed(1)}px;top:8px;bottom:8px;"
-          data-tip="${escAttr(tooltipHTML(t))}">
+          data-tip="${escAttr(tooltipHTML(t, { unitTotal }))}">
           <span class="tb-lbl">${label}</span>
         </div>`;
             }).join('');
@@ -1696,7 +1727,9 @@ function renderMachineView(tasks, c) {
         return groupRow + machRows;
     }).join('');
 
+    const totalTasks = Object.values(machMap).reduce((sum, m) => sum + m.tasks.length, 0);
     c.innerHTML = _ganttWrap(LW, totW, dates, DW, 'Machine View', `${Object.keys(machMap).length} machines`, rowsHTML);
+    console.log('[MachineView] Rendering', totalTasks, 'tasks across', Object.keys(machMap).length, 'machines');
     attachTooltips(c);
 }
 

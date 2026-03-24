@@ -26,7 +26,7 @@ Open `http://localhost:8000`. The app requires a Supabase connection to function
 - `app.js` — Client state, scheduling engine, Supabase reads/writes, upload, rendering, event listeners (numbered sections 1–25)
 - `styles.css` — CSS custom properties (theme tokens), dark/light themes, component styles
 - `database.sql` — Reference schema for Supabase tables (read-only context, not executable)
-- `v1/` — Legacy snapshot; do not modify during normal feature work
+- `v1/` — Legacy snapshot; do not modify during normal feature work. Contains earlier version of the dashboard for reference only.
 
 ### State Flow
 ```
@@ -36,6 +36,8 @@ init() → loadSettings() → loadShifts() → loadProdSequence() → loadMachin
                                                                                          ↓
                                                      renderDashboard() + renderGanttFiltered()
 ```
+
+**Building Switcher:** The app supports two buildings (B1/B2) via `activeBuildingId` global. All table names are prefixed (`building1_*`, `building2_*`). The switcher is in the header and reloads all data on change.
 
 ### Scheduling Engine (Section 8)
 - Works on **integer working-day slots** (fractional days for sub-day tasks)
@@ -58,6 +60,13 @@ init() → loadSettings() → loadShifts() → loadProdSequence() → loadMachin
 - **Friday is NEVER a working day** regardless of settings
 - **Saturday is optional** (`saturday_working` setting)
 - Sunday–Thursday are always working days
+
+### Time Units
+The `time_unit` setting (`'h'` or `'min'`) controls how `op_hrs` values are interpreted:
+- `'h'` (default): Values are hours (e.g., 3.5 = 3.5 hours)
+- `'min'`: Values are minutes and are converted to hours by dividing by 60 (e.g., 210 = 3.5 hours)
+
+This affects the scheduling calculation in `expandPart()`.
 
 ### Vehicle Battalion Sizes
 ```js
@@ -89,9 +98,39 @@ const BATTALION = { K9: 18, K10: 3, K11: 4 };  // total 25
 | 24 · Theme | Dark/light toggle via `data-theme` on `<html>` |
 | 25 · Event Listeners | `attachListeners()` |
 
+### File Upload Format
+The upload modal accepts `.xlsx`, `.xls`, and `.csv` files. Expected columns (Sheet 1):
+- `part_number` (required), `part_name` (required)
+- `op_hrs` — Operation hours per unit
+- `k9`, `k10`, `k11` — Vehicle flags (`'O'` = required for that vehicle type)
+- `k9_qty`, `k10_qty`, `k11_qty` — Optional manual distribution quantities
+- `remaining_qty` — Units to produce
+- `location` — Must match a configured Machine Type
+- `status` — `not_started`, `in_progress`, or `complete`
+- `sort_order` — Scheduling priority (lower = earlier)
+
+See the template downloaded from the Data panel for the full column specification.
+
 ### Gantt Tooltips
 - `attachTooltips(container)` — attaches mouseenter/mousemove/mouseleave to `.tb`, `.unit-tick`, `.wk-cell-wrap`
 - **Important**: `data-tip` attribute values use `escAttr()` (not `esc()`) — `esc()` escapes `<` and `>` which breaks HTML parsing in attribute context; `escAttr()` only escapes `&`, `"`, `'` leaving `<>` intact
+
+### Keyboard Shortcuts
+Implemented in `attachListeners()` (Section 25):
+
+| Key | Action |
+|-----|--------|
+| `?` | Show shortcuts modal |
+| `N` | Add new part |
+| `M` | Add new machine |
+| `Ctrl+U` | Upload data (focus file input) |
+| `Ctrl+S` | Save settings |
+| `Esc` | Close modal / cancel |
+| `Ctrl+F` | Focus search (parts table) |
+| `T` | Jump to today (Gantt) |
+| `1` | Machine view (Gantt) |
+| `2` | Part view (Gantt) |
+| `3` | Weekly view (Gantt) |
 
 ### Supabase Tables
 - `building1_settings` — Plan start date, day start/end, saturday_working, time_unit, **production_sequence (jsonb)**
@@ -99,6 +138,8 @@ const BATTALION = { K9: 18, K10: 3, K11: 4 };  // total 25
 - `building1_shifts` — Shift number, name, start/end time, active_days (jsonb)
 - `building1_parts` — Part data with k9/k10/k11 flags, qty, location, unit_overrides (jsonb)
 - `building1_active_parts` — Derived cache table maintained by the app
+
+**Note:** The `production_sequence` column stores the user-defined build pattern as JSON array `[{partId, vehicle, qty}]`. See `database.sql` for full schema reference.
 
 ## Coding Style
 - 4-space indentation in HTML, CSS, JS

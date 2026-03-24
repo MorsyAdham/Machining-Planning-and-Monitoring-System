@@ -3876,7 +3876,7 @@ textarea {
 /* ── Rich tooltip ── */
 .gantt-tooltip {
     position: fixed;
-    z-index: 9000;
+    z-index: 99999;
     pointer-events: none;
     background: var(--s1);
     border: 1px solid var(--bd2);
@@ -3886,7 +3886,12 @@ textarea {
     overflow: hidden;
     min-width: 220px;
     max-width: 320px;
-    animation: dropIn .12s ease both;
+    animation: tooltipFadeIn .15s ease both;
+}
+
+@keyframes tooltipFadeIn {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: translateY(0); }
 }
 
 .gantt-tooltip.hidden {
@@ -3935,6 +3940,18 @@ textarea {
     font-size: .62rem;
     color: var(--tea);
     flex-shrink: 0;
+}
+
+.gt-seq {
+    font-family: var(--ff-m);
+    font-size: .58rem;
+    font-weight: 600;
+    color: var(--amb);
+    background: var(--ambg);
+    border: 1px solid var(--amb);
+    border-radius: 3px;
+    padding: 1px 6px;
+    margin-left: auto;
 }
 
 .gt-body {
@@ -5065,7 +5082,6 @@ select:focus-visible {
     background: var(--bg1);
     color: var(--tx);
     color-scheme: dark;
-}
     font-size: .8rem;
     font-family: var(--ff-d);
     min-width: 0;
