@@ -1010,6 +1010,44 @@
     opacity: .4;
 }
 
+.machine-day-overrides {
+    display: grid;
+    gap: 10px;
+}
+
+.machine-day-row {
+    display: grid;
+    grid-template-columns: 54px 1fr;
+    gap: 10px;
+    align-items: start;
+}
+
+.machine-day-label {
+    font-family: var(--ff-m);
+    font-size: .66rem;
+    text-transform: uppercase;
+    letter-spacing: .1em;
+    color: var(--tx3);
+    padding-top: 6px;
+}
+
+.machine-day-checks {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.day-shift-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 10px;
+    border-radius: 999px;
+    border: 1px solid var(--bd);
+    background: var(--s2);
+    font-size: .76rem;
+}
+
 .sc-label {
     font-family: var(--ff-d);
     font-size: .9rem;

@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Assembly Production Dashboard v2.1</title>
+    <link rel="stylesheet" href="assets/styles/style.css">
+</head>
+
+<body>
+    <header class="top">
+        <div class="header-left">
+            <img src="assets/img/logo1.png" alt="Logo" class="header-logo" onerror="this.style.display='none'">
+            <div class="header-title">
+                <h1>Assembly Production System</h1>
+                <p class="muted">© 2026 Adham Morsy | Version 2.1.0</p>
+            </div>
+        </div>
+        <div class="header-right">
+            <div class="user-info">
+                <div class="user-badge" id="userEmail">User</div>
+                <div class="user-badge role-badge" id="userRole">Role</div>
+            </div>
+            <button id="auditLogsBtn" class="btn btn-secondary" style="display: none;" onclick="showAuditLogsModal()">📋
+                Audit Logs</button>
+            <button id="logoutBtn" class="btn btn-logout">Logout</button>
+        </div>
+    </header>
+
+    <div class="container">
+        <!-- USER MANAGEMENT -->
+        <section id="userManagementSection" class="card" style="display: none;">
+            <div class="card-header">
+                <h3>👥 User Management</h3>
+                <button id="showAddUserBtn" class="btn btn-primary">+ Add User</button>
+            </div>
+            <div id="addUserForm" class="form-section" style="display: none;">
+                <h4>Add New User</h4>
+                <div class="form-grid">
+                    <div class="form-group"><label>Username *</label><input type="text" id="newUsername" required></div>
+                    <div class="form-group"><label>Password *</label><input type="password" id="newPassword" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Role *</label>
+                        <select id="newUserRole" required>
+                            <option value="">Select...</option>
+                            <option value="master_admin">Master Admin</option>
+                            <option value="admin">Admin</option>
+                            <option value="viewer">Viewer</option>
+                            <option value="customer">Customer</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-actions">
+                    <button id="addUserBtn" class="btn btn-primary">Add User</button>
+                    <button id="cancelAddUserBtn" class="btn btn-secondary">Cancel</button>
+                    <p id="userError" class="error-msg"></p>
+                    <p id="userSuccess" class="success-msg"></p>
+                </div>
+            </div>
+            <div class="table-scroll">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Username</th>
+                            <th>Role</th>
+                            <th>Created</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="usersTableBody"></tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- SUMMARY CARDS -->
+        <section class="summary-section">
+            <div class="summary-grid">
+                <div class="card summary-card">
+                    <div class="card-icon">🚗</div><strong>Total Vehicles</strong>
+                    <div class="big" id="totalVehicles">0</div>
+                    <div class="muted">In Production</div>
+                </div>
+                <div class="card summary-card">
+                    <div class="card-icon">✅</div><strong>Completed Stations</strong>
+                    <div class="big" id="completedStations">0</div>
+                    <div class="muted">All Vehicles</div>
+                </div>
+                <div class="card summary-card">
+                    <div class="card-icon">⏳</div><strong>Pending Stations</strong>
+                    <div class="big" id="pendingStations">0</div>
+                    <div class="muted">Awaiting Work</div>
+                </div>
+                <div class="card summary-card">
+                    <div class="card-icon">📝</div><strong>Open Requests</strong>
+                    <div class="big" id="openRequests">0</div>
+                    <div class="muted">Pending Delivery</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- TABS -->
+        <div class="tabs">
+            <button class="tab-btn active" data-tab="requests">📝 Requests</button>
+            <button class="tab-btn" data-tab="production">🏭 Production Status</button>
+            <button class="tab-btn" data-tab="vehicles">🚗 Vehicles</button>
+            <button class="tab-btn" data-tab="analytics">📊 Analytics</button>
+        </div>
+
+        <!-- REQUESTS TAB -->
+        <div id="requestsTab" class="tab-content active">
+            <section id="addRequestSection" class="card">
+                <div class="card-header">
+                    <h3>📝 Create New Request</h3>
+                </div>
+                <div class="form-grid">
+                    <div class="form-group"><label>Vehicle Type *</label><select id="reqVehicleType" required>
+                            <option value="">Select...</option>
+                            <option value="K9">K9</option>
+                            <option value="K10">K10</option>
+                            <option value="K11">K11</option>
+                        </select></div>
+                    <div class="form-group"><label>Vehicle Number *</label><select id="reqVehicleNumber" required>
+                            <option value="">Select...</option>
+                        </select></div>
+                    <div class="form-group"><label>Station *</label><select id="reqStationCode" required>
+                            <option value="">Select...</option>
+                        </select></div>
+                    <div class="form-group"><label>Request Type *</label><select id="reqType" required>
+                            <option value="">Select...</option>
+                            <option value="station">Station (Complete)</option>
+                            <option value="part">Part (Specific)</option>
+                        </select></div>
+                </div>
+                <div id="partFields" style="display: none;">
+                    <h4 style="margin: 16px 0 8px 0;">Part Numbers</h4>
+                    <div style="overflow-x: auto;">
+                        <table id="partsTable" style="width: 100%; margin-bottom: 12px;">
+                            <thead>
+                                <tr>
+                                    <th style="text-align: left;">Part Number</th>
+                                    <th style="text-align: left;">Quantity</th>
+                                    <th style="width: 80px;">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="partsTableBody">
+                                <tr>
+                                    <td><input type="text" class="part-number-input" placeholder="e.g., MS90727-59"
+                                            style="width: 100%;"></td>
+                                    <td><input type="number" class="part-qty-input" min="1" placeholder="Qty"
+                                            style="width: 100%;"></td>
+                                    <td><button type="button" class="btn-icon delete" onclick="removePartRow(this)"
+                                            title="Remove">🗑️</button></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <button type="button" class="btn btn-secondary" onclick="addPartRow()">+ Add Another Part</button>
+                </div>
+                <div class="form-grid">
+                    <div class="form-group checkbox-group">
+                        <label>
+                            <input type="checkbox" id="reqFastener">
+                            <span>Fastener</span>
+                        </label>
+                    </div>
+                    <div class="form-group" style="grid-column: 1 / -1;">
+                        <label for="reqComments">Comments (Optional)</label>
+                        <textarea id="reqComments" rows="2" placeholder="Add any notes or comments..."></textarea>
+                    </div>
+                </div>
+                <div class="form-actions">
+                    <button id="createRequestBtn" class="btn btn-primary">Create Request</button>
+                    <p id="requestError" class="error-msg"></p>
+                    <p id="requestSuccess" class="success-msg"></p>
+                </div>
+            </section>
+
+            <section class="card">
+                <div class="card-header">
+                    <h3>🔍 Requests</h3>
+                    <div class="header-actions">
+                        <button id="exportRequestsStandardPDF" class="btn btn-secondary">📄 Standard Report</button>
+                        <button id="exportRequestsCheckPDF" class="btn btn-secondary">📋 Check Report</button>
+                        <button id="exportRequestsExcel" class="btn btn-secondary">📊 Export Excel</button>
+                    </div>
+                </div>
+                <div class="filters">
+                    <div class="filter-group"><label>Status</label><select id="filterStatus">
+                            <option value="">All</option>
+                            <option value="open">Open</option>
+                            <option value="delivered">Delivered</option>
+                        </select></div>
+                    <div class="filter-group"><label>Type</label><select id="filterReqType">
+                            <option value="">All</option>
+                            <option value="station">Station</option>
+                            <option value="part">Part</option>
+                        </select></div>
+                    <div class="filter-group"><label>Vehicle Type</label><select id="filterVehicleType">
+                            <option value="">All</option>
+                            <option value="K9">K9</option>
+                            <option value="K10">K10</option>
+                            <option value="K11">K11</option>
+                        </select></div>
+                    <div class="filter-group"><label>Fastener</label><select id="filterFastener">
+                            <option value="">All</option>
+                            <option value="yes">Fastener</option>
+                            <option value="no">Not Fastener</option>
+                        </select></div>
+                    <div class="filter-group"><label>Search</label><input type="text" id="searchRequest"
+                            placeholder="Search..."></div>
+                </div>
+                <div class="table-scroll">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Vehicle</th>
+                                <th>Station</th>
+                                <th>Type</th>
+                                <th>Part Number</th>
+                                <th>Qty</th>
+                                <th>Fastener</th>
+                                <th>Location</th>
+                                <th>Status</th>
+                                <th>Requested By</th>
+                                <th>Request Date</th>
+                                <th>Delivery Date</th>
+                                <th>Comments</th>
+                                <th id="actionsHeader">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="requestsTableBody"></tbody>
+                    </table>
+                </div>
+            </section>
+        </div>
+
+        <!-- PRODUCTION TAB -->
+        <div id="productionTab" class="tab-content">
+            <section id="addVehicleSection" class="card" style="display: none;">
+                <div class="card-header">
+                    <h3>🚗 Add New Vehicle</h3>
+                </div>
+                <div class="form-grid">
+                    <div class="form-group"><label>Vehicle Type *</label><select id="newVehicleType" required>
+                            <option value="">Select...</option>
+                            <option value="K9">K9</option>
+                            <option value="K10">K10</option>
+                            <option value="K11">K11</option>
+                        </select></div>
+                    <div class="form-group"><label>Vehicle Number *</label><input type="text" id="newVehicleNumber"
+                            placeholder="e.g., K9-M3" required></div>
+                </div>
+                <div class="form-actions">
+                    <button id="addVehicleBtn" class="btn btn-primary">Add Vehicle</button>
+                    <p id="vehicleError" class="error-msg"></p>
+                    <p id="vehicleSuccess" class="success-msg"></p>
+                </div>
+            </section>
+            <section class="card">
+                <div class="card-header">
+                    <h3>🏭 Production Status</h3>
+                </div>
+                <div class="filters">
+                    <div class="filter-group"><label>Select Vehicle</label><select id="filterProdVehicle">
+                            <option value="">All Vehicles</option>
+                        </select></div>
+                    <div class="filter-group"><label>Status</label><select id="filterProdStatus">
+                            <option value="">All</option>
+                            <option value="pending">Pending</option>
+                            <option value="in_progress">In Progress</option>
+                            <option value="completed">Completed</option>
+                        </select></div>
+                </div>
+                <div class="table-scroll">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Vehicle Number</th>
+                                <th>Station</th>
+                                <th>Status</th>
+                                <th>Last Updated</th>
+                                <th id="prodActionsHeader">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="productionTableBody"></tbody>
+                    </table>
+                </div>
+            </section>
+        </div>
+
+        <!-- VEHICLES TAB -->
+        <div id="vehiclesTab" class="tab-content">
+            <section class="card">
+                <div class="card-header">
+                    <h3>🚗 Vehicles</h3>
+                </div>
+                <div class="filters">
+                    <div class="filter-group"><label>Vehicle Type</label><select id="filterVehicles">
+                            <option value="">All</option>
+                            <option value="K9">K9</option>
+                            <option value="K10">K10</option>
+                            <option value="K11">K11</option>
+                        </select></div>
+                </div>
+                <div class="table-scroll">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Vehicle Number</th>
+                                <th>Type</th>
+                                <th>Total Stations</th>
+                                <th>Completed</th>
+                                <th>In Progress</th>
+                                <th>Pending</th>
+                                <th>Progress</th>
+                                <th>Created</th>
+                            </tr>
+                        </thead>
+                        <tbody id="vehiclesTableBody"></tbody>
+                    </table>
+                </div>
+            </section>
+        </div>
+
+        <!-- ANALYTICS TAB -->
+        <div id="analyticsTab" class="tab-content">
+            <section class="card">
+                <div class="card-header">
+                    <h3>📊 Analytics Dashboard</h3>
+                    <button id="exportAnalyticsPDF" class="btn btn-secondary">📄 Export Report</button>
+                </div>
+                <div class="charts-grid">
+                    <div class="chart-container">
+                        <h4>Production Status by Vehicle Type</h4><canvas id="productionByTypeChart"></canvas>
+                    </div>
+                    <div class="chart-container">
+                        <h4>Request Status Distribution</h4><canvas id="requestStatusChart"></canvas>
+                    </div>
+                    <div class="chart-container">
+                        <h4>Requests Timeline (30 Days)</h4><canvas id="requestTimelineChart"></canvas>
+                    </div>
+                    <div class="chart-container">
+                        <h4>Request Type Breakdown</h4><canvas id="requestTypeChart"></canvas>
+                    </div>
+                    <div class="chart-container">
+                        <h4>Requests by Vehicle Type</h4><canvas id="requestsByVehicleChart"></canvas>
+                    </div>
+                    <div class="chart-container">
+                        <h4>Production Progress by Vehicle</h4>
+                        <canvas id="progressByVehicleChart" style="height: 400px;"></canvas>
+                    </div>
+                    <div class="chart-container">
+                        <h4>Daily Request Trend (7 Days)</h4><canvas id="dailyRequestTrendChart"></canvas>
+                    </div>
+                    <div class="chart-container">
+                        <h4>Station Completion Rate</h4><canvas id="stationCompletionChart"></canvas>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <footer>
+        <p>&copy; 2026 Adham Morsy | Version 2.1.0</p>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.0/dist/umd/supabase.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <script src="assets/scripts/app.js"></script>
+</body>
+
+</html>

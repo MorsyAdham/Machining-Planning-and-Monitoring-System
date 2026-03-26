@@ -71,6 +71,7 @@ CREATE TABLE public.building1_machines (
   created_at timestamp with time zone DEFAULT now(),
   updated_at timestamp with time zone DEFAULT now(),
   active_shifts jsonb,
+  shift_day_overrides jsonb NOT NULL DEFAULT '{}'::jsonb,
   building_id integer NOT NULL DEFAULT 1,
   CONSTRAINT building1_machines_pkey PRIMARY KEY (id)
 );

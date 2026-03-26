@@ -681,7 +681,7 @@ body[data-system-layout="guided"] .loading-overlay {
 
 .app-navbar {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) auto auto;
+    grid-template-columns: minmax(0, 1fr) auto;
     align-items: center;
     gap: 14px;
     min-width: 0;
@@ -719,12 +719,8 @@ body[data-system-layout="guided"] .loading-overlay {
     min-width: 0;
 }
 
-.hdr-nav-primary {
-    justify-content: flex-start;
-}
-
 .hdr-nav-actions {
-    justify-content: center;
+    justify-content: flex-start;
 }
 
 .workspace-nav-btn,
@@ -981,6 +977,232 @@ body[data-system-layout="guided"] #panel-gantt .panel-body-flush {
     border-color: rgba(148, 163, 184, .2);
 }
 
+:root[data-theme="light"] body[data-system-layout="guided"] {
+    background:
+        radial-gradient(circle at top center, rgba(214, 165, 74, .14), transparent 28%),
+        linear-gradient(180deg, #f4efe5 0%, #ece4d7 100%);
+}
+
+:root[data-theme="light"] body[data-system-layout="guided"] .app-header {
+    border-color: rgba(177, 153, 116, .24);
+    background:
+        linear-gradient(180deg, rgba(249, 245, 237, .92), rgba(242, 234, 222, .9)),
+        linear-gradient(90deg, rgba(214, 165, 74, .08), transparent 32%);
+    box-shadow: 0 18px 40px rgba(112, 91, 52, .12);
+}
+
+:root[data-theme="light"] body[data-system-layout="guided"] .hdr-logo {
+    background: linear-gradient(180deg, rgba(214, 165, 74, .16), rgba(214, 165, 74, .05));
+}
+
+:root[data-theme="light"] body[data-system-layout="guided"] .hdr-title,
+:root[data-theme="light"] body[data-system-layout="guided"] .panel-hdr h2,
+:root[data-theme="light"] body[data-system-layout="guided"] .rpt-card-titles h4,
+:root[data-theme="light"] body[data-system-layout="guided"] .gt-name,
+:root[data-theme="light"] body[data-system-layout="guided"] .sr-name,
+:root[data-theme="light"] body[data-system-layout="guided"] .sc-name {
+    color: #243549;
+}
+
+:root[data-theme="light"] body[data-system-layout="guided"] .hdr-title em,
+:root[data-theme="light"] body[data-system-layout="guided"] .md-value,
+:root[data-theme="light"] body[data-system-layout="guided"] .num-acc,
+:root[data-theme="light"] body[data-system-layout="guided"] .mt-daily,
+:root[data-theme="light"] body[data-system-layout="guided"] .gt-seq {
+    color: #c48a2a;
+}
+
+:root[data-theme="light"] body[data-system-layout="guided"] .hdr-eyebrow,
+:root[data-theme="light"] body[data-system-layout="guided"] .dd-hint,
+:root[data-theme="light"] body[data-system-layout="guided"] .mf-hint,
+:root[data-theme="light"] body[data-system-layout="guided"] .reports-intro,
+:root[data-theme="light"] body[data-system-layout="guided"] .row-count,
+:root[data-theme="light"] body[data-system-layout="guided"] .last-upd,
+:root[data-theme="light"] body[data-system-layout="guided"] .panel-count,
+:root[data-theme="light"] body[data-system-layout="guided"] .gl-lbl,
+:root[data-theme="light"] body[data-system-layout="guided"] .gt-row-label,
+:root[data-theme="light"] body[data-system-layout="guided"] .rpt-card-titles p,
+:root[data-theme="light"] body[data-system-layout="guided"] .seq-intro,
+:root[data-theme="light"] body[data-system-layout="guided"] .seq-summary,
+:root[data-theme="light"] body[data-system-layout="guided"] .us-empty,
+:root[data-theme="light"] body[data-system-layout="guided"] .ge-sub,
+:root[data-theme="light"] body[data-system-layout="guided"] #status-text-inline {
+    color: #756d61;
+}
+
+:root[data-theme="light"] body[data-system-layout="guided"] .bld-switcher,
+:root[data-theme="light"] body[data-system-layout="guided"] .nav-btn,
+:root[data-theme="light"] body[data-system-layout="guided"] .layout-picker,
+:root[data-theme="light"] body[data-system-layout="guided"] .btn-theme,
+:root[data-theme="light"] body[data-system-layout="guided"] .bat-total,
+:root[data-theme="light"] body[data-system-layout="guided"] .workspace-subbar .conn-status,
+:root[data-theme="light"] body[data-system-layout="guided"] .search-box,
+:root[data-theme="light"] body[data-system-layout="guided"] .fsel,
+:root[data-theme="light"] body[data-system-layout="guided"] .drop-zone,
+:root[data-theme="light"] body[data-system-layout="guided"] .shift-row,
+:root[data-theme="light"] body[data-system-layout="guided"] .shift-check-item,
+:root[data-theme="light"] body[data-system-layout="guided"] .us-container,
+:root[data-theme="light"] body[data-system-layout="guided"] .part-info-bar,
+:root[data-theme="light"] body[data-system-layout="guided"] .modal-derived,
+:root[data-theme="light"] body[data-system-layout="guided"] .rpt-card,
+:root[data-theme="light"] body[data-system-layout="guided"] .seq-table-wrap,
+:root[data-theme="light"] body[data-system-layout="guided"] .seq-summary,
+:root[data-theme="light"] body[data-system-layout="guided"] .seq-add-form,
+:root[data-theme="light"] body[data-system-layout="guided"] .gv-switcher {
+    background: rgba(255, 251, 245, .92);
+    border-color: rgba(190, 176, 148, .32);
+}
+
+:root[data-theme="light"] body[data-system-layout="guided"] .nav-btn,
+:root[data-theme="light"] body[data-system-layout="guided"] .layout-picker,
+:root[data-theme="light"] body[data-system-layout="guided"] .btn-theme {
+    color: #324457;
+}
+
+:root[data-theme="light"] body[data-system-layout="guided"] .nav-btn:hover,
+:root[data-theme="light"] body[data-system-layout="guided"] .nav-btn[aria-expanded="true"],
+:root[data-theme="light"] body[data-system-layout="guided"] .btn-theme:hover,
+:root[data-theme="light"] body[data-system-layout="guided"] .drop-zone:hover,
+:root[data-theme="light"] body[data-system-layout="guided"] .drop-zone.dragover,
+:root[data-theme="light"] body[data-system-layout="guided"] .shift-row:hover,
+:root[data-theme="light"] body[data-system-layout="guided"] .shift-check-item:hover,
+:root[data-theme="light"] body[data-system-layout="guided"] .rpt-card:hover {
+    background: rgba(245, 239, 229, .98);
+    border-color: rgba(196, 138, 42, .26);
+}
+
+:root[data-theme="light"] body[data-system-layout="guided"] .layout-picker select {
+    border-left-color: rgba(190, 176, 148, .36);
+    color: #324457;
+}
+
+:root[data-theme="light"] body[data-system-layout="guided"] .panel {
+    background: linear-gradient(180deg, #fffdf9 0%, #f8f3ea 100%);
+    border-color: rgba(190, 176, 148, .28);
+    box-shadow: 0 14px 30px rgba(112, 91, 52, .09);
+}
+
+:root[data-theme="light"] body[data-system-layout="guided"] .panel-hdr,
+:root[data-theme="light"] body[data-system-layout="guided"] .modal-hdr,
+:root[data-theme="light"] body[data-system-layout="guided"] .modal-ftr,
+:root[data-theme="light"] body[data-system-layout="guided"] .dd-hdr,
+:root[data-theme="light"] body[data-system-layout="guided"] .parts-table thead tr,
+:root[data-theme="light"] body[data-system-layout="guided"] .machines-table thead tr,
+:root[data-theme="light"] body[data-system-layout="guided"] .us-table thead tr,
+:root[data-theme="light"] body[data-system-layout="guided"] .seq-table th,
+:root[data-theme="light"] body[data-system-layout="guided"] .gh-row,
+:root[data-theme="light"] body[data-system-layout="guided"] .gt-head {
+    background: #efe7db;
+    border-color: rgba(190, 176, 148, .3);
+}
+
+:root[data-theme="light"] body[data-system-layout="guided"] .kpi-card {
+    background: linear-gradient(180deg, #fffdfa 0%, #f7f0e6 100%);
+    border-color: rgba(190, 176, 148, .26);
+}
+
+:root[data-theme="light"] body[data-system-layout="guided"] .kpi-accent {
+    background: linear-gradient(180deg, #f3e1bf 0%, #edd5aa 100%);
+    border-color: rgba(196, 138, 42, .3);
+}
+
+:root[data-theme="light"] body[data-system-layout="guided"] .parts-table td,
+:root[data-theme="light"] body[data-system-layout="guided"] .machines-table td,
+:root[data-theme="light"] body[data-system-layout="guided"] .us-table td,
+:root[data-theme="light"] body[data-system-layout="guided"] .seq-table td {
+    border-color: rgba(210, 199, 175, .72);
+    color: #324457;
+}
+
+:root[data-theme="light"] body[data-system-layout="guided"] .parts-table tr:hover td,
+:root[data-theme="light"] body[data-system-layout="guided"] .machines-table tr:hover td,
+:root[data-theme="light"] body[data-system-layout="guided"] .us-table tbody tr:hover,
+:root[data-theme="light"] body[data-system-layout="guided"] .seq-table tbody tr:hover {
+    background: rgba(245, 239, 229, .9);
+}
+
+:root[data-theme="light"] body[data-system-layout="guided"] .mf-field input,
+:root[data-theme="light"] body[data-system-layout="guided"] .mf-field select,
+:root[data-theme="light"] body[data-system-layout="guided"] .us-date-inp,
+:root[data-theme="light"] body[data-system-layout="guided"] .seq-field select,
+:root[data-theme="light"] body[data-system-layout="guided"] .seq-field input,
+:root[data-theme="light"] body[data-system-layout="guided"] textarea,
+:root[data-theme="light"] body[data-system-layout="guided"] .search-inp,
+:root[data-theme="light"] body[data-system-layout="guided"] .fsel {
+    background: #fffdf9;
+    border-color: rgba(190, 176, 148, .34);
+    color: #2f4356;
+}
+
+:root[data-theme="light"] body[data-system-layout="guided"] .mf-field input:focus,
+:root[data-theme="light"] body[data-system-layout="guided"] .mf-field select:focus,
+:root[data-theme="light"] body[data-system-layout="guided"] .us-date-inp:focus,
+:root[data-theme="light"] body[data-system-layout="guided"] .seq-field select:focus,
+:root[data-theme="light"] body[data-system-layout="guided"] .seq-field input:focus,
+:root[data-theme="light"] body[data-system-layout="guided"] textarea:focus,
+:root[data-theme="light"] body[data-system-layout="guided"] .search-inp:focus,
+:root[data-theme="light"] body[data-system-layout="guided"] .fsel:focus {
+    border-color: rgba(196, 138, 42, .5);
+    box-shadow: 0 0 0 2px rgba(196, 138, 42, .12);
+}
+
+:root[data-theme="light"] body[data-system-layout="guided"] .modal,
+:root[data-theme="light"] body[data-system-layout="guided"] .dd-panel,
+:root[data-theme="light"] body[data-system-layout="guided"] .gantt-tooltip {
+    background: rgba(255, 251, 245, .97);
+    border-color: rgba(190, 176, 148, .3);
+    box-shadow: 0 18px 40px rgba(112, 91, 52, .14);
+}
+
+:root[data-theme="light"] body[data-system-layout="guided"] .gantt-container {
+    background: #fbf8f2;
+}
+
+:root[data-theme="light"] body[data-system-layout="guided"] .btn-outline,
+:root[data-theme="light"] body[data-system-layout="guided"] .btn-ghost,
+:root[data-theme="light"] body[data-system-layout="guided"] .btn-link,
+:root[data-theme="light"] body[data-system-layout="guided"] .btn-icon-sm,
+:root[data-theme="light"] body[data-system-layout="guided"] .btn-tbl,
+:root[data-theme="light"] body[data-system-layout="guided"] .btn-order {
+    background: #fffdf9;
+    border-color: rgba(190, 176, 148, .34);
+    color: #324457;
+}
+
+:root[data-theme="light"] body[data-system-layout="guided"] .btn-outline:hover,
+:root[data-theme="light"] body[data-system-layout="guided"] .btn-ghost:hover,
+:root[data-theme="light"] body[data-system-layout="guided"] .btn-link:hover,
+:root[data-theme="light"] body[data-system-layout="guided"] .btn-icon-sm:hover,
+:root[data-theme="light"] body[data-system-layout="guided"] .btn-tbl:hover,
+:root[data-theme="light"] body[data-system-layout="guided"] .btn-order:hover {
+    background: #f3ece1;
+    border-color: rgba(196, 138, 42, .26);
+}
+
+:root[data-theme="light"] body[data-system-layout="guided"] .btn-teal,
+:root[data-theme="light"] body[data-system-layout="guided"] .btn-tbl-e,
+:root[data-theme="light"] body[data-system-layout="guided"] .rpt-btn--xlsx {
+    background: #e9f1f7;
+    border-color: rgba(96, 132, 167, .26);
+    color: #2f5f89;
+}
+
+:root[data-theme="light"] body[data-system-layout="guided"] .btn-tbl-d,
+:root[data-theme="light"] body[data-system-layout="guided"] .rpt-btn--pdf,
+:root[data-theme="light"] body[data-system-layout="guided"] .btn-danger {
+    background: #f7e8e6;
+    border-color: rgba(183, 94, 94, .24);
+    color: #9a4949;
+}
+
+:root[data-theme="light"] body[data-system-layout="guided"] .bat-pill,
+:root[data-theme="light"] body[data-system-layout="guided"] .mt-type,
+:root[data-theme="light"] body[data-system-layout="guided"] .target-date-badge,
+:root[data-theme="light"] body[data-system-layout="guided"] .shift-badge {
+    background: #fff8ee;
+    border-color: rgba(196, 138, 42, .24);
+}
+
 @media (max-width: 1380px) {
     .app-navbar {
         grid-template-columns: 1fr;
@@ -1033,7 +1255,6 @@ body[data-system-layout="guided"] #panel-gantt .panel-body-flush {
         font-size: 1.12rem;
     }
 
-    .hdr-nav-primary,
     .hdr-nav-actions,
     .hdr-right {
         display: grid;
@@ -1041,7 +1262,6 @@ body[data-system-layout="guided"] #panel-gantt .panel-body-flush {
         width: 100%;
     }
 
-    .workspace-nav-btn,
     .nav-btn,
     .layout-picker,
     .btn-theme {
@@ -1057,4 +1277,769 @@ body[data-system-layout="guided"] #panel-gantt .panel-body-flush {
         align-items: flex-start;
         flex-direction: column;
     }
+}
+
+/* Final guided light-theme sweep */
+:root[data-theme="light"] body[data-system-layout="guided"] {
+    background:
+        radial-gradient(circle at top center, rgba(196, 138, 42, .16), transparent 26%),
+        linear-gradient(180deg, #f6f1e8 0%, #ede4d6 100%) !important;
+}
+
+:root[data-theme="light"] body[data-system-layout="guided"] .app-header,
+:root[data-theme="light"] body[data-system-layout="guided"] .workspace-subbar,
+:root[data-theme="light"] body[data-system-layout="guided"] .panel,
+:root[data-theme="light"] body[data-system-layout="guided"] .modal,
+:root[data-theme="light"] body[data-system-layout="guided"] .dd-panel,
+:root[data-theme="light"] body[data-system-layout="guided"] .gantt-tooltip,
+:root[data-theme="light"] body[data-system-layout="guided"] .gantt-container,
+:root[data-theme="light"] body[data-system-layout="guided"] .search-box,
+:root[data-theme="light"] body[data-system-layout="guided"] .fsel,
+:root[data-theme="light"] body[data-system-layout="guided"] .drop-zone,
+:root[data-theme="light"] body[data-system-layout="guided"] .shift-row,
+:root[data-theme="light"] body[data-system-layout="guided"] .shift-check-item,
+:root[data-theme="light"] body[data-system-layout="guided"] .us-container,
+:root[data-theme="light"] body[data-system-layout="guided"] .part-info-bar,
+:root[data-theme="light"] body[data-system-layout="guided"] .modal-derived,
+:root[data-theme="light"] body[data-system-layout="guided"] .rpt-card,
+:root[data-theme="light"] body[data-system-layout="guided"] .seq-table-wrap,
+:root[data-theme="light"] body[data-system-layout="guided"] .seq-summary,
+:root[data-theme="light"] body[data-system-layout="guided"] .seq-add-form,
+:root[data-theme="light"] body[data-system-layout="guided"] .gv-switcher,
+:root[data-theme="light"] body[data-system-layout="guided"] .bat-total,
+:root[data-theme="light"] body[data-system-layout="guided"] .workspace-subbar .conn-status {
+    background: #fffaf2 !important;
+    border-color: rgba(191, 174, 143, .42) !important;
+    color: #2f455a !important;
+}
+
+:root[data-theme="light"] body[data-system-layout="guided"] .panel-hdr,
+:root[data-theme="light"] body[data-system-layout="guided"] .modal-hdr,
+:root[data-theme="light"] body[data-system-layout="guided"] .modal-ftr,
+:root[data-theme="light"] body[data-system-layout="guided"] .dd-hdr,
+:root[data-theme="light"] body[data-system-layout="guided"] .parts-table thead tr,
+:root[data-theme="light"] body[data-system-layout="guided"] .machines-table thead tr,
+:root[data-theme="light"] body[data-system-layout="guided"] .us-table thead tr,
+:root[data-theme="light"] body[data-system-layout="guided"] .seq-table th,
+:root[data-theme="light"] body[data-system-layout="guided"] .gh-row,
+:root[data-theme="light"] body[data-system-layout="guided"] .gt-head,
+:root[data-theme="light"] body[data-system-layout="guided"] .gh-corner,
+:root[data-theme="light"] body[data-system-layout="guided"] .g-date,
+:root[data-theme="light"] body[data-system-layout="guided"] .gmach-lbl,
+:root[data-theme="light"] body[data-system-layout="guided"] .gtask-lbl,
+:root[data-theme="light"] body[data-system-layout="guided"] .gtype-lbl {
+    background: #f0e7da !important;
+    border-color: rgba(191, 174, 143, .42) !important;
+    color: #405468 !important;
+}
+
+:root[data-theme="light"] body[data-system-layout="guided"] .hdr-title,
+:root[data-theme="light"] body[data-system-layout="guided"] .panel-hdr h2,
+:root[data-theme="light"] body[data-system-layout="guided"] .modal-hdr h3,
+:root[data-theme="light"] body[data-system-layout="guided"] .kv,
+:root[data-theme="light"] body[data-system-layout="guided"] .rpt-card-titles h4,
+:root[data-theme="light"] body[data-system-layout="guided"] .gt-name,
+:root[data-theme="light"] body[data-system-layout="guided"] .sr-name,
+:root[data-theme="light"] body[data-system-layout="guided"] .sc-name,
+:root[data-theme="light"] body[data-system-layout="guided"] .parts-table td,
+:root[data-theme="light"] body[data-system-layout="guided"] .machines-table td,
+:root[data-theme="light"] body[data-system-layout="guided"] .us-table td,
+:root[data-theme="light"] body[data-system-layout="guided"] .seq-table td {
+    color: #2f455a !important;
+}
+
+:root[data-theme="light"] body[data-system-layout="guided"] .hdr-eyebrow,
+:root[data-theme="light"] body[data-system-layout="guided"] .kl,
+:root[data-theme="light"] body[data-system-layout="guided"] .ks,
+:root[data-theme="light"] body[data-system-layout="guided"] .dd-hint,
+:root[data-theme="light"] body[data-system-layout="guided"] .mf-hint,
+:root[data-theme="light"] body[data-system-layout="guided"] .pm-dist-hint,
+:root[data-theme="light"] body[data-system-layout="guided"] .reports-intro,
+:root[data-theme="light"] body[data-system-layout="guided"] .row-count,
+:root[data-theme="light"] body[data-system-layout="guided"] .last-upd,
+:root[data-theme="light"] body[data-system-layout="guided"] .panel-count,
+:root[data-theme="light"] body[data-system-layout="guided"] .gl-lbl,
+:root[data-theme="light"] body[data-system-layout="guided"] .gt-row-label,
+:root[data-theme="light"] body[data-system-layout="guided"] .rpt-card-titles p,
+:root[data-theme="light"] body[data-system-layout="guided"] .seq-intro,
+:root[data-theme="light"] body[data-system-layout="guided"] .seq-summary,
+:root[data-theme="light"] body[data-system-layout="guided"] .us-empty,
+:root[data-theme="light"] body[data-system-layout="guided"] .ge-sub,
+:root[data-theme="light"] body[data-system-layout="guided"] .gt-pn,
+:root[data-theme="light"] body[data-system-layout="guided"] #status-text-inline {
+    color: #766f63 !important;
+}
+
+:root[data-theme="light"] body[data-system-layout="guided"] .hdr-title em,
+:root[data-theme="light"] body[data-system-layout="guided"] .num-acc,
+:root[data-theme="light"] body[data-system-layout="guided"] .mt-daily,
+:root[data-theme="light"] body[data-system-layout="guided"] .md-value,
+:root[data-theme="light"] body[data-system-layout="guided"] .gt-seq,
+:root[data-theme="light"] body[data-system-layout="guided"] .modal-tag {
+    color: #b87a17 !important;
+}
+
+:root[data-theme="light"] body[data-system-layout="guided"] .modal-tag,
+:root[data-theme="light"] body[data-system-layout="guided"] .kpi-accent,
+:root[data-theme="light"] body[data-system-layout="guided"] .bat-pill,
+:root[data-theme="light"] body[data-system-layout="guided"] .mt-type,
+:root[data-theme="light"] body[data-system-layout="guided"] .target-date-badge,
+:root[data-theme="light"] body[data-system-layout="guided"] .shift-badge {
+    background: #fff3df !important;
+    border-color: rgba(196, 138, 42, .34) !important;
+}
+
+:root[data-theme="light"] body[data-system-layout="guided"] .kpi-card {
+    background: linear-gradient(180deg, #fffdf8 0%, #f8efe2 100%) !important;
+    border-color: rgba(191, 174, 143, .34) !important;
+}
+
+:root[data-theme="light"] body[data-system-layout="guided"] .parts-table tr:hover td,
+:root[data-theme="light"] body[data-system-layout="guided"] .machines-table tr:hover td,
+:root[data-theme="light"] body[data-system-layout="guided"] .us-table tbody tr:hover,
+:root[data-theme="light"] body[data-system-layout="guided"] .seq-table tbody tr:hover,
+:root[data-theme="light"] body[data-system-layout="guided"] .drop-zone:hover,
+:root[data-theme="light"] body[data-system-layout="guided"] .drop-zone.dragover,
+:root[data-theme="light"] body[data-system-layout="guided"] .shift-row:hover,
+:root[data-theme="light"] body[data-system-layout="guided"] .shift-check-item:hover,
+:root[data-theme="light"] body[data-system-layout="guided"] .rpt-card:hover {
+    background: #f6ede0 !important;
+    border-color: rgba(196, 138, 42, .28) !important;
+}
+
+:root[data-theme="light"] body[data-system-layout="guided"] .mf-field input,
+:root[data-theme="light"] body[data-system-layout="guided"] .mf-field select,
+:root[data-theme="light"] body[data-system-layout="guided"] .us-date-inp,
+:root[data-theme="light"] body[data-system-layout="guided"] .seq-field select,
+:root[data-theme="light"] body[data-system-layout="guided"] .seq-field input,
+:root[data-theme="light"] body[data-system-layout="guided"] textarea,
+:root[data-theme="light"] body[data-system-layout="guided"] .search-inp,
+:root[data-theme="light"] body[data-system-layout="guided"] .fsel,
+:root[data-theme="light"] body[data-system-layout="guided"] .layout-picker select {
+    background: #fffdf9 !important;
+    border-color: rgba(191, 174, 143, .42) !important;
+    color: #2f455a !important;
+}
+
+:root[data-theme="light"] body[data-system-layout="guided"] .mf-field input:focus,
+:root[data-theme="light"] body[data-system-layout="guided"] .mf-field select:focus,
+:root[data-theme="light"] body[data-system-layout="guided"] .us-date-inp:focus,
+:root[data-theme="light"] body[data-system-layout="guided"] .seq-field select:focus,
+:root[data-theme="light"] body[data-system-layout="guided"] .seq-field input:focus,
+:root[data-theme="light"] body[data-system-layout="guided"] textarea:focus,
+:root[data-theme="light"] body[data-system-layout="guided"] .search-inp:focus,
+:root[data-theme="light"] body[data-system-layout="guided"] .fsel:focus {
+    border-color: rgba(196, 138, 42, .6) !important;
+    box-shadow: 0 0 0 2px rgba(196, 138, 42, .14) !important;
+}
+
+:root[data-theme="light"] body[data-system-layout="guided"] .btn-outline,
+:root[data-theme="light"] body[data-system-layout="guided"] .btn-ghost,
+:root[data-theme="light"] body[data-system-layout="guided"] .btn-link,
+:root[data-theme="light"] body[data-system-layout="guided"] .btn-icon-sm,
+:root[data-theme="light"] body[data-system-layout="guided"] .btn-tbl,
+:root[data-theme="light"] body[data-system-layout="guided"] .btn-order,
+:root[data-theme="light"] body[data-system-layout="guided"] .nav-btn,
+:root[data-theme="light"] body[data-system-layout="guided"] .layout-picker,
+:root[data-theme="light"] body[data-system-layout="guided"] .btn-theme {
+    background: #fffaf2 !important;
+    border-color: rgba(191, 174, 143, .42) !important;
+    color: #31485c !important;
+}
+
+:root[data-theme="light"] body[data-system-layout="guided"] .btn-outline:hover,
+:root[data-theme="light"] body[data-system-layout="guided"] .btn-ghost:hover,
+:root[data-theme="light"] body[data-system-layout="guided"] .btn-link:hover,
+:root[data-theme="light"] body[data-system-layout="guided"] .btn-icon-sm:hover,
+:root[data-theme="light"] body[data-system-layout="guided"] .btn-tbl:hover,
+:root[data-theme="light"] body[data-system-layout="guided"] .btn-order:hover,
+:root[data-theme="light"] body[data-system-layout="guided"] .nav-btn:hover,
+:root[data-theme="light"] body[data-system-layout="guided"] .nav-btn[aria-expanded="true"],
+:root[data-theme="light"] body[data-system-layout="guided"] .btn-theme:hover {
+    background: #f3e9da !important;
+    border-color: rgba(196, 138, 42, .28) !important;
+}
+
+:root[data-theme="light"] body[data-system-layout="guided"] .btn-teal,
+:root[data-theme="light"] body[data-system-layout="guided"] .btn-tbl-e,
+:root[data-theme="light"] body[data-system-layout="guided"] .rpt-btn--xlsx {
+    background: #e7eef5 !important;
+    border-color: rgba(110, 147, 190, .34) !important;
+    color: #355f86 !important;
+}
+
+:root[data-theme="light"] body[data-system-layout="guided"] .btn-tbl-d,
+:root[data-theme="light"] body[data-system-layout="guided"] .rpt-btn--pdf,
+:root[data-theme="light"] body[data-system-layout="guided"] .btn-danger {
+    background: #f7e6e1 !important;
+    border-color: rgba(183, 94, 94, .28) !important;
+    color: #9a4949 !important;
+}
+
+:root[data-theme="light"] body[data-system-layout="guided"] .toast-success {
+    background: #e8f3ea !important;
+    color: #2f6e48 !important;
+}
+
+:root[data-theme="light"] body[data-system-layout="guided"] .toast-error {
+    background: #f7e6e1 !important;
+    color: #9a4949 !important;
+}
+
+:root[data-theme="light"] body[data-system-layout="guided"] .toast-info {
+    background: #e7eef5 !important;
+    color: #355f86 !important;
+}
+
+/* Exact light palette from Assembly-Production-Monitoring-System */
+:root[data-theme="light"] body[data-system-layout="guided"] {
+    background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%) !important;
+}
+
+:root[data-theme="light"] body[data-system-layout="guided"] .app-header {
+    background: rgba(255, 255, 255, 0.2) !important;
+    border: 1px solid rgba(255, 255, 255, 0.18) !important;
+    box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.15) !important;
+    backdrop-filter: blur(20px) saturate(180%) !important;
+    -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
+}
+
+:root[data-theme="light"] body[data-system-layout="guided"] .app-header::before {
+    background: linear-gradient(90deg, #00a8ff 0%, #667eea 25%, #f093fb 50%, #4facfe 75%, #00a8ff 100%) !important;
+}
+
+:root[data-theme="light"] body[data-system-layout="guided"] .hdr-logo {
+    background: rgba(255, 255, 255, 0.3) !important;
+}
+
+:root[data-theme="light"] body[data-system-layout="guided"] .hdr-title,
+:root[data-theme="light"] body[data-system-layout="guided"] .panel-hdr h2,
+:root[data-theme="light"] body[data-system-layout="guided"] .modal-hdr h3,
+:root[data-theme="light"] body[data-system-layout="guided"] .rpt-card-titles h4,
+:root[data-theme="light"] body[data-system-layout="guided"] .gt-name,
+:root[data-theme="light"] body[data-system-layout="guided"] .sr-name,
+:root[data-theme="light"] body[data-system-layout="guided"] .sc-name,
+:root[data-theme="light"] body[data-system-layout="guided"] .parts-table td,
+:root[data-theme="light"] body[data-system-layout="guided"] .machines-table td,
+:root[data-theme="light"] body[data-system-layout="guided"] .us-table td,
+:root[data-theme="light"] body[data-system-layout="guided"] .seq-table td,
+:root[data-theme="light"] body[data-system-layout="guided"] .kv {
+    color: #2f3640 !important;
+}
+
+:root[data-theme="light"] body[data-system-layout="guided"] .hdr-title {
+    background: linear-gradient(135deg, #2f3640 0%, #00a8ff 100%) !important;
+    -webkit-background-clip: text !important;
+    -webkit-text-fill-color: transparent !important;
+    background-clip: text !important;
+}
+
+:root[data-theme="light"] body[data-system-layout="guided"] .hdr-title em {
+    color: inherit !important;
+}
+
+:root[data-theme="light"] body[data-system-layout="guided"] .hdr-eyebrow,
+:root[data-theme="light"] body[data-system-layout="guided"] .kl,
+:root[data-theme="light"] body[data-system-layout="guided"] .ks,
+:root[data-theme="light"] body[data-system-layout="guided"] .dd-hint,
+:root[data-theme="light"] body[data-system-layout="guided"] .mf-hint,
+:root[data-theme="light"] body[data-system-layout="guided"] .pm-dist-hint,
+:root[data-theme="light"] body[data-system-layout="guided"] .reports-intro,
+:root[data-theme="light"] body[data-system-layout="guided"] .row-count,
+:root[data-theme="light"] body[data-system-layout="guided"] .last-upd,
+:root[data-theme="light"] body[data-system-layout="guided"] .panel-count,
+:root[data-theme="light"] body[data-system-layout="guided"] .gl-lbl,
+:root[data-theme="light"] body[data-system-layout="guided"] .gt-row-label,
+:root[data-theme="light"] body[data-system-layout="guided"] .rpt-card-titles p,
+:root[data-theme="light"] body[data-system-layout="guided"] .seq-intro,
+:root[data-theme="light"] body[data-system-layout="guided"] .seq-summary,
+:root[data-theme="light"] body[data-system-layout="guided"] .us-empty,
+:root[data-theme="light"] body[data-system-layout="guided"] .ge-sub,
+:root[data-theme="light"] body[data-system-layout="guided"] .gt-pn,
+:root[data-theme="light"] body[data-system-layout="guided"] #status-text-inline {
+    color: #718093 !important;
+}
+
+:root[data-theme="light"] body[data-system-layout="guided"] .workspace-subbar,
+:root[data-theme="light"] body[data-system-layout="guided"] .panel,
+:root[data-theme="light"] body[data-system-layout="guided"] .modal,
+:root[data-theme="light"] body[data-system-layout="guided"] .dd-panel,
+:root[data-theme="light"] body[data-system-layout="guided"] .gantt-tooltip,
+:root[data-theme="light"] body[data-system-layout="guided"] .gantt-container,
+:root[data-theme="light"] body[data-system-layout="guided"] .search-box,
+:root[data-theme="light"] body[data-system-layout="guided"] .fsel,
+:root[data-theme="light"] body[data-system-layout="guided"] .drop-zone,
+:root[data-theme="light"] body[data-system-layout="guided"] .shift-row,
+:root[data-theme="light"] body[data-system-layout="guided"] .shift-check-item,
+:root[data-theme="light"] body[data-system-layout="guided"] .us-container,
+:root[data-theme="light"] body[data-system-layout="guided"] .part-info-bar,
+:root[data-theme="light"] body[data-system-layout="guided"] .modal-derived,
+:root[data-theme="light"] body[data-system-layout="guided"] .rpt-card,
+:root[data-theme="light"] body[data-system-layout="guided"] .seq-table-wrap,
+:root[data-theme="light"] body[data-system-layout="guided"] .seq-summary,
+:root[data-theme="light"] body[data-system-layout="guided"] .seq-add-form,
+:root[data-theme="light"] body[data-system-layout="guided"] .gv-switcher,
+:root[data-theme="light"] body[data-system-layout="guided"] .bat-total,
+:root[data-theme="light"] body[data-system-layout="guided"] .workspace-subbar .conn-status {
+    background: #ffffff !important;
+    border-color: #dcdde1 !important;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05) !important;
+    color: #2f3640 !important;
+}
+
+:root[data-theme="light"] body[data-system-layout="guided"] .panel:hover,
+:root[data-theme="light"] body[data-system-layout="guided"] .rpt-card:hover {
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08) !important;
+}
+
+:root[data-theme="light"] body[data-system-layout="guided"] .panel-hdr,
+:root[data-theme="light"] body[data-system-layout="guided"] .modal-hdr,
+:root[data-theme="light"] body[data-system-layout="guided"] .modal-ftr,
+:root[data-theme="light"] body[data-system-layout="guided"] .dd-hdr,
+:root[data-theme="light"] body[data-system-layout="guided"] .parts-table thead tr,
+:root[data-theme="light"] body[data-system-layout="guided"] .machines-table thead tr,
+:root[data-theme="light"] body[data-system-layout="guided"] .us-table thead tr,
+:root[data-theme="light"] body[data-system-layout="guided"] .seq-table th,
+:root[data-theme="light"] body[data-system-layout="guided"] .gh-row,
+:root[data-theme="light"] body[data-system-layout="guided"] .gt-head,
+:root[data-theme="light"] body[data-system-layout="guided"] .gh-corner,
+:root[data-theme="light"] body[data-system-layout="guided"] .g-date,
+:root[data-theme="light"] body[data-system-layout="guided"] .gmach-lbl,
+:root[data-theme="light"] body[data-system-layout="guided"] .gtask-lbl,
+:root[data-theme="light"] body[data-system-layout="guided"] .gtype-lbl {
+    background: #f0f2f5 !important;
+    border-color: #dcdde1 !important;
+    color: #57606f !important;
+}
+
+:root[data-theme="light"] body[data-system-layout="guided"] .kpi-card {
+    background: #ffffff !important;
+    border-color: #dcdde1 !important;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05) !important;
+}
+
+:root[data-theme="light"] body[data-system-layout="guided"] .kpi-accent {
+    background: rgba(0, 168, 255, 0.1) !important;
+    border-color: rgba(0, 151, 230, 0.22) !important;
+}
+
+:root[data-theme="light"] body[data-system-layout="guided"] .mf-field input,
+:root[data-theme="light"] body[data-system-layout="guided"] .mf-field select,
+:root[data-theme="light"] body[data-system-layout="guided"] .us-date-inp,
+:root[data-theme="light"] body[data-system-layout="guided"] .seq-field select,
+:root[data-theme="light"] body[data-system-layout="guided"] .seq-field input,
+:root[data-theme="light"] body[data-system-layout="guided"] textarea,
+:root[data-theme="light"] body[data-system-layout="guided"] .search-inp,
+:root[data-theme="light"] body[data-system-layout="guided"] .fsel,
+:root[data-theme="light"] body[data-system-layout="guided"] .layout-picker select {
+    background: #ffffff !important;
+    border-color: #dcdde1 !important;
+    color: #2f3640 !important;
+}
+
+:root[data-theme="light"] body[data-system-layout="guided"] .mf-field input:focus,
+:root[data-theme="light"] body[data-system-layout="guided"] .mf-field select:focus,
+:root[data-theme="light"] body[data-system-layout="guided"] .us-date-inp:focus,
+:root[data-theme="light"] body[data-system-layout="guided"] .seq-field select:focus,
+:root[data-theme="light"] body[data-system-layout="guided"] .seq-field input:focus,
+:root[data-theme="light"] body[data-system-layout="guided"] textarea:focus,
+:root[data-theme="light"] body[data-system-layout="guided"] .search-inp:focus,
+:root[data-theme="light"] body[data-system-layout="guided"] .fsel:focus {
+    border-color: #00a8ff !important;
+    box-shadow: 0 0 0 3px rgba(0, 168, 255, 0.1) !important;
+}
+
+:root[data-theme="light"] body[data-system-layout="guided"] .parts-table tr:hover td,
+:root[data-theme="light"] body[data-system-layout="guided"] .machines-table tr:hover td,
+:root[data-theme="light"] body[data-system-layout="guided"] .us-table tbody tr:hover,
+:root[data-theme="light"] body[data-system-layout="guided"] .seq-table tbody tr:hover,
+:root[data-theme="light"] body[data-system-layout="guided"] .drop-zone:hover,
+:root[data-theme="light"] body[data-system-layout="guided"] .drop-zone.dragover,
+:root[data-theme="light"] body[data-system-layout="guided"] .shift-row:hover,
+:root[data-theme="light"] body[data-system-layout="guided"] .shift-check-item:hover {
+    background: #f0f2f5 !important;
+    border-color: #dcdde1 !important;
+}
+
+:root[data-theme="light"] body[data-system-layout="guided"] .btn-outline,
+:root[data-theme="light"] body[data-system-layout="guided"] .btn-ghost,
+:root[data-theme="light"] body[data-system-layout="guided"] .btn-link,
+:root[data-theme="light"] body[data-system-layout="guided"] .btn-icon-sm,
+:root[data-theme="light"] body[data-system-layout="guided"] .btn-tbl,
+:root[data-theme="light"] body[data-system-layout="guided"] .btn-order,
+:root[data-theme="light"] body[data-system-layout="guided"] .nav-btn,
+:root[data-theme="light"] body[data-system-layout="guided"] .layout-picker,
+:root[data-theme="light"] body[data-system-layout="guided"] .btn-theme {
+    background: #ffffff !important;
+    border-color: #dcdde1 !important;
+    color: #2f3640 !important;
+}
+
+:root[data-theme="light"] body[data-system-layout="guided"] .btn-outline:hover,
+:root[data-theme="light"] body[data-system-layout="guided"] .btn-ghost:hover,
+:root[data-theme="light"] body[data-system-layout="guided"] .btn-link:hover,
+:root[data-theme="light"] body[data-system-layout="guided"] .btn-icon-sm:hover,
+:root[data-theme="light"] body[data-system-layout="guided"] .btn-tbl:hover,
+:root[data-theme="light"] body[data-system-layout="guided"] .btn-order:hover,
+:root[data-theme="light"] body[data-system-layout="guided"] .nav-btn:hover,
+:root[data-theme="light"] body[data-system-layout="guided"] .nav-btn[aria-expanded="true"],
+:root[data-theme="light"] body[data-system-layout="guided"] .btn-theme:hover {
+    background: #f0f2f5 !important;
+    border-color: #00a8ff !important;
+    color: #0097e6 !important;
+}
+
+:root[data-theme="light"] body[data-system-layout="guided"] .btn-amber,
+:root[data-theme="light"] body[data-system-layout="guided"] .btn-teal,
+:root[data-theme="light"] body[data-system-layout="guided"] .btn-tbl-e,
+:root[data-theme="light"] body[data-system-layout="guided"] .rpt-btn--xlsx {
+    background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%) !important;
+    border-color: rgba(255, 255, 255, 0.2) !important;
+    color: #ffffff !important;
+}
+
+:root[data-theme="light"] body[data-system-layout="guided"] .btn-tbl-d,
+:root[data-theme="light"] body[data-system-layout="guided"] .rpt-btn--pdf,
+:root[data-theme="light"] body[data-system-layout="guided"] .btn-danger {
+    background: linear-gradient(135deg, #e84118 0%, #c23616 100%) !important;
+    border-color: rgba(255, 255, 255, 0.2) !important;
+    color: #ffffff !important;
+}
+
+:root[data-theme="light"] body[data-system-layout="guided"] .bat-pill,
+:root[data-theme="light"] body[data-system-layout="guided"] .mt-type,
+:root[data-theme="light"] body[data-system-layout="guided"] .target-date-badge,
+:root[data-theme="light"] body[data-system-layout="guided"] .shift-badge {
+    background: rgba(0, 168, 255, 0.1) !important;
+    border-color: rgba(0, 151, 230, 0.2) !important;
+    color: #0097e6 !important;
+}
+
+:root[data-theme="light"] body[data-system-layout="guided"] .sb-not_started,
+:root[data-theme="light"] body[data-system-layout="guided"] .mt-badge.off,
+:root[data-theme="light"] body[data-system-layout="guided"] .sr-badge.off {
+    background: #f0f2f5 !important;
+    border-color: #dcdde1 !important;
+    color: #718093 !important;
+}
+
+:root[data-theme="light"] body[data-system-layout="guided"] .sb-in_progress {
+    background: rgba(243, 156, 18, 0.1) !important;
+    border-color: rgba(243, 156, 18, 0.24) !important;
+    color: #f39c12 !important;
+}
+
+:root[data-theme="light"] body[data-system-layout="guided"] .sb-complete,
+:root[data-theme="light"] body[data-system-layout="guided"] .mt-badge.on,
+:root[data-theme="light"] body[data-system-layout="guided"] .sr-badge.on {
+    background: rgba(68, 189, 50, 0.1) !important;
+    border-color: rgba(68, 189, 50, 0.24) !important;
+    color: #44bd32 !important;
+}
+
+:root[data-theme="light"] body[data-system-layout="guided"] .toast-success {
+    background: rgba(68, 189, 50, 0.1) !important;
+    color: #44bd32 !important;
+}
+
+:root[data-theme="light"] body[data-system-layout="guided"] .toast-error {
+    background: rgba(232, 65, 24, 0.1) !important;
+    color: #e84118 !important;
+}
+
+:root[data-theme="light"] body[data-system-layout="guided"] .toast-info {
+    background: rgba(0, 168, 255, 0.1) !important;
+    color: #0097e6 !important;
+}
+
+/* Global exact light theme from Assembly Production Monitoring System */
+:root[data-theme="light"] {
+    --bg: #f5f7fa !important;
+    --s1: #ffffff !important;
+    --s2: #f0f2f5 !important;
+    --s3: #eef2f7 !important;
+    --s4: #e4ebf3 !important;
+    --bd: #dcdde1 !important;
+    --bd2: #c7d2df !important;
+    --tx: #2f3640 !important;
+    --tx2: #57606f !important;
+    --tx3: #718093 !important;
+    --tx4: #c7d2df !important;
+    --amb: #00a8ff !important;
+    --amb2: #0097e6 !important;
+    --ambg: rgba(0, 168, 255, 0.1) !important;
+    --ambd: rgba(0, 168, 255, 0.06) !important;
+    --tea: #0097e6 !important;
+    --tea2: #48dbfb !important;
+    --teag: rgba(0, 168, 255, 0.1) !important;
+    --tead: rgba(0, 168, 255, 0.06) !important;
+    --k9c: #44bd32 !important;
+    --k9d: #d9f3d4 !important;
+    --k9g: rgba(68, 189, 50, 0.1) !important;
+    --k10c: #f39c12 !important;
+    --k10d: #fdecc8 !important;
+    --k10g: rgba(243, 156, 18, 0.1) !important;
+    --k11c: #00a8ff !important;
+    --k11d: #d8f2ff !important;
+    --k11g: rgba(0, 168, 255, 0.1) !important;
+    --ok: #44bd32 !important;
+    --err: #e84118 !important;
+    --warn: #f39c12 !important;
+    --info: #0097e6 !important;
+    --sh: 0 8px 20px rgba(0, 0, 0, 0.12) !important;
+    --sh-sm: 0 4px 10px rgba(0, 0, 0, 0.08) !important;
+    --inp-bg: #ffffff !important;
+    --inp-bd: #dcdde1 !important;
+    --inp-tx: #2f3640 !important;
+}
+
+:root[data-theme="light"] body {
+    background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%) !important;
+    background-attachment: fixed !important;
+    color: #2f3640 !important;
+}
+
+:root[data-theme="light"] .app-header {
+    background: rgba(255, 255, 255, 0.2) !important;
+    border: 1px solid rgba(255, 255, 255, 0.18) !important;
+    box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.15) !important;
+    backdrop-filter: blur(20px) saturate(180%) !important;
+    -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
+}
+
+:root[data-theme="light"] .app-header::before {
+    background: linear-gradient(90deg, #00a8ff 0%, #667eea 25%, #f093fb 50%, #4facfe 75%, #00a8ff 100%) !important;
+}
+
+:root[data-theme="light"] .hdr-logo,
+:root[data-theme="light"] .bld-switcher,
+:root[data-theme="light"] .layout-picker,
+:root[data-theme="light"] .btn-theme,
+:root[data-theme="light"] .nav-btn,
+:root[data-theme="light"] .workspace-subbar,
+:root[data-theme="light"] .bat-total,
+:root[data-theme="light"] .conn-status,
+:root[data-theme="light"] .panel,
+:root[data-theme="light"] .modal,
+:root[data-theme="light"] .dd-panel,
+:root[data-theme="light"] .gantt-tooltip,
+:root[data-theme="light"] .gantt-container,
+:root[data-theme="light"] .search-box,
+:root[data-theme="light"] .fsel,
+:root[data-theme="light"] .drop-zone,
+:root[data-theme="light"] .shift-row,
+:root[data-theme="light"] .shift-check-item,
+:root[data-theme="light"] .us-container,
+:root[data-theme="light"] .part-info-bar,
+:root[data-theme="light"] .modal-derived,
+:root[data-theme="light"] .rpt-card,
+:root[data-theme="light"] .seq-table-wrap,
+:root[data-theme="light"] .seq-summary,
+:root[data-theme="light"] .seq-add-form,
+:root[data-theme="light"] .gv-switcher,
+:root[data-theme="light"] .empty-state {
+    background: rgba(255, 255, 255, 0.85) !important;
+    border-color: rgba(255, 255, 255, 0.3) !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08) !important;
+}
+
+:root[data-theme="light"] .panel-hdr,
+:root[data-theme="light"] .modal-hdr,
+:root[data-theme="light"] .modal-ftr,
+:root[data-theme="light"] .dd-hdr,
+:root[data-theme="light"] .parts-table thead tr,
+:root[data-theme="light"] .machines-table thead tr,
+:root[data-theme="light"] .us-table thead tr,
+:root[data-theme="light"] .seq-table th,
+:root[data-theme="light"] .gh-row,
+:root[data-theme="light"] .gt-head,
+:root[data-theme="light"] .gh-corner,
+:root[data-theme="light"] .g-date,
+:root[data-theme="light"] .gmach-lbl,
+:root[data-theme="light"] .gtask-lbl,
+:root[data-theme="light"] .gtype-lbl {
+    background: #f0f2f5 !important;
+    border-color: #dcdde1 !important;
+    color: #57606f !important;
+}
+
+:root[data-theme="light"] .hdr-title,
+:root[data-theme="light"] .panel-hdr h2,
+:root[data-theme="light"] .modal-hdr h3,
+:root[data-theme="light"] .rpt-card-titles h4,
+:root[data-theme="light"] .gt-name,
+:root[data-theme="light"] .sr-name,
+:root[data-theme="light"] .sc-name,
+:root[data-theme="light"] .parts-table td,
+:root[data-theme="light"] .machines-table td,
+:root[data-theme="light"] .us-table td,
+:root[data-theme="light"] .seq-table td,
+:root[data-theme="light"] .empty-state strong,
+:root[data-theme="light"] .es-title,
+:root[data-theme="light"] .kv {
+    color: #2f3640 !important;
+}
+
+:root[data-theme="light"] .hdr-title {
+    background: linear-gradient(135deg, #2f3640 0%, #00a8ff 100%) !important;
+    -webkit-background-clip: text !important;
+    -webkit-text-fill-color: transparent !important;
+    background-clip: text !important;
+}
+
+:root[data-theme="light"] .hdr-title em {
+    color: inherit !important;
+}
+
+:root[data-theme="light"] .hdr-eyebrow,
+:root[data-theme="light"] .kl,
+:root[data-theme="light"] .ks,
+:root[data-theme="light"] .dd-hint,
+:root[data-theme="light"] .mf-hint,
+:root[data-theme="light"] .pm-dist-hint,
+:root[data-theme="light"] .reports-intro,
+:root[data-theme="light"] .row-count,
+:root[data-theme="light"] .last-upd,
+:root[data-theme="light"] .panel-count,
+:root[data-theme="light"] .gl-lbl,
+:root[data-theme="light"] .gt-row-label,
+:root[data-theme="light"] .rpt-card-titles p,
+:root[data-theme="light"] .seq-intro,
+:root[data-theme="light"] .seq-summary,
+:root[data-theme="light"] .us-empty,
+:root[data-theme="light"] .ge-sub,
+:root[data-theme="light"] .gt-pn,
+:root[data-theme="light"] #status-text,
+:root[data-theme="light"] #status-text-inline {
+    color: #718093 !important;
+}
+
+:root[data-theme="light"] .mf-field input,
+:root[data-theme="light"] .mf-field select,
+:root[data-theme="light"] .us-date-inp,
+:root[data-theme="light"] .seq-field select,
+:root[data-theme="light"] .seq-field input,
+:root[data-theme="light"] textarea,
+:root[data-theme="light"] .search-inp,
+:root[data-theme="light"] .fsel,
+:root[data-theme="light"] .layout-picker select {
+    background: #ffffff !important;
+    border-color: #dcdde1 !important;
+    color: #2f3640 !important;
+}
+
+:root[data-theme="light"] .mf-field input:focus,
+:root[data-theme="light"] .mf-field select:focus,
+:root[data-theme="light"] .us-date-inp:focus,
+:root[data-theme="light"] .seq-field select:focus,
+:root[data-theme="light"] .seq-field input:focus,
+:root[data-theme="light"] textarea:focus,
+:root[data-theme="light"] .search-inp:focus,
+:root[data-theme="light"] .fsel:focus {
+    border-color: #00a8ff !important;
+    box-shadow: 0 0 0 3px rgba(0, 168, 255, 0.1) !important;
+}
+
+:root[data-theme="light"] .parts-table tr:hover td,
+:root[data-theme="light"] .machines-table tr:hover td,
+:root[data-theme="light"] .us-table tbody tr:hover,
+:root[data-theme="light"] .seq-table tbody tr:hover,
+:root[data-theme="light"] .drop-zone:hover,
+:root[data-theme="light"] .drop-zone.dragover,
+:root[data-theme="light"] .shift-row:hover,
+:root[data-theme="light"] .shift-check-item:hover,
+:root[data-theme="light"] .rpt-card:hover {
+    background: #f0f2f5 !important;
+    border-color: #dcdde1 !important;
+}
+
+:root[data-theme="light"] .nav-btn,
+:root[data-theme="light"] .layout-picker,
+:root[data-theme="light"] .btn-theme,
+:root[data-theme="light"] .btn-outline,
+:root[data-theme="light"] .btn-ghost,
+:root[data-theme="light"] .btn-link,
+:root[data-theme="light"] .btn-icon-sm,
+:root[data-theme="light"] .btn-tbl,
+:root[data-theme="light"] .btn-order {
+    background: rgba(255, 255, 255, 0.6) !important;
+    border-color: rgba(255, 255, 255, 0.3) !important;
+    color: #2f3640 !important;
+}
+
+:root[data-theme="light"] .nav-btn:hover,
+:root[data-theme="light"] .nav-btn[aria-expanded="true"],
+:root[data-theme="light"] .btn-theme:hover,
+:root[data-theme="light"] .btn-outline:hover,
+:root[data-theme="light"] .btn-ghost:hover,
+:root[data-theme="light"] .btn-link:hover,
+:root[data-theme="light"] .btn-icon-sm:hover,
+:root[data-theme="light"] .btn-tbl:hover,
+:root[data-theme="light"] .btn-order:hover {
+    background: rgba(255, 255, 255, 0.85) !important;
+    border-color: #00a8ff !important;
+    color: #0097e6 !important;
+}
+
+:root[data-theme="light"] .btn-amber,
+:root[data-theme="light"] .btn-teal,
+:root[data-theme="light"] .btn-tbl-e,
+:root[data-theme="light"] .rpt-btn--xlsx {
+    background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%) !important;
+    border-color: rgba(255, 255, 255, 0.2) !important;
+    color: #ffffff !important;
+}
+
+:root[data-theme="light"] .btn-tbl-d,
+:root[data-theme="light"] .rpt-btn--pdf,
+:root[data-theme="light"] .btn-danger {
+    background: linear-gradient(135deg, #e84118 0%, #c23616 100%) !important;
+    border-color: rgba(255, 255, 255, 0.2) !important;
+    color: #ffffff !important;
+}
+
+:root[data-theme="light"] .bat-pill,
+:root[data-theme="light"] .mt-type,
+:root[data-theme="light"] .target-date-badge,
+:root[data-theme="light"] .shift-badge {
+    background: rgba(0, 168, 255, 0.1) !important;
+    border-color: rgba(0, 151, 230, 0.2) !important;
+    color: #0097e6 !important;
+}
+
+:root[data-theme="light"] .sb-not_started,
+:root[data-theme="light"] .mt-badge.off,
+:root[data-theme="light"] .sr-badge.off {
+    background: #f0f2f5 !important;
+    border-color: #dcdde1 !important;
+    color: #718093 !important;
+}
+
+:root[data-theme="light"] .sb-in_progress {
+    background: rgba(243, 156, 18, 0.1) !important;
+    border-color: rgba(243, 156, 18, 0.24) !important;
+    color: #f39c12 !important;
+}
+
+:root[data-theme="light"] .sb-complete,
+:root[data-theme="light"] .mt-badge.on,
+:root[data-theme="light"] .sr-badge.on {
+    background: rgba(68, 189, 50, 0.1) !important;
+    border-color: rgba(68, 189, 50, 0.24) !important;
+    color: #44bd32 !important;
+}
+
+:root[data-theme="light"] .toast-success {
+    background: rgba(68, 189, 50, 0.1) !important;
+    color: #44bd32 !important;
+}
+
+:root[data-theme="light"] .toast-error {
+    background: rgba(232, 65, 24, 0.1) !important;
+    color: #e84118 !important;
+}
+
+:root[data-theme="light"] .toast-info {
+    background: rgba(0, 168, 255, 0.1) !important;
+    color: #0097e6 !important;
 }

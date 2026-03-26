@@ -104,17 +104,67 @@ export function localDateStr(d) {
     return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
 }
 
-export function mDailyForMachine(machine, allShifts) {
-    const active = machine.active_shifts;
-    let totalH = 0;
-    if (active && Array.isArray(active) && active.length > 0) {
-        active.forEach(sn => {
-            const shift = allShifts.find(s => s.shift_number === sn);
-            if (shift) totalH += shiftDuration(shift);
-        });
-    } else {
-        totalH = (machine.num_shifts || 1) * (machine.shift_hours || 8);
+export function normalizeMachineShiftDayOverrides(raw) {
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
+    const out = {};
+    Object.entries(raw).forEach(([key, value]) => {
+        const dow = parseInt(key, 10);
+        if (!Number.isInteger(dow) || dow < 0 || dow > 6 || !Array.isArray(value)) return;
+        out[String(dow)] = value
+            .map(v => parseInt(v, 10))
+            .filter(v => Number.isInteger(v))
+            .filter((v, idx, arr) => arr.indexOf(v) === idx);
+    });
+    return out;
+}
+
+export function getMachineBaseShiftNumbers(machine, allShifts) {
+    if (Array.isArray(machine?.active_shifts) && machine.active_shifts.length) {
+        return machine.active_shifts
+            .map(v => parseInt(v, 10))
+            .filter(v => Number.isInteger(v));
     }
+    return allShifts.slice(0, machine?.num_shifts || 1).map(s => s.shift_number);
+}
+
+export function getMachineActiveShiftNumbersForDow(machine, dow, allShifts) {
+    if (dow === 5) return [];
+    const baseShiftNums = getMachineBaseShiftNumbers(machine, allShifts);
+    const allowedByShift = baseShiftNums.filter(sn => {
+        const shift = allShifts.find(s => s.shift_number === sn);
+        const activeDays = Array.isArray(shift?.active_days) ? shift.active_days : [];
+        return !!shift && shift.is_active !== false && activeDays.includes(dow);
+    });
+
+    const overrides = normalizeMachineShiftDayOverrides(machine?.shift_day_overrides);
+    const dayOverride = overrides[String(dow)];
+    if (!Array.isArray(dayOverride)) return allowedByShift;
+    return allowedByShift.filter(sn => dayOverride.includes(sn));
+}
+
+export function getMachineHoursForDow(machine, dow, allShifts) {
+    const totalH = getMachineActiveShiftNumbersForDow(machine, dow, allShifts)
+        .reduce((sum, sn) => {
+            const shift = allShifts.find(s => s.shift_number === sn);
+            return sum + (shift ? shiftDuration(shift) : 0);
+        }, 0);
+    return totalH * ((machine.capacity_percent || 100) / 100);
+}
+
+export function mDailyForMachine(machine, allShifts, settings = null) {
+    const dows = settings
+        ? [0, 1, 2, 3, 4].concat(settings.saturday_working ? [6] : [])
+        : [0, 1, 2, 3, 4, 6];
+    const hours = dows.map(dow => getMachineHoursForDow(machine, dow, allShifts));
+    const nonZero = hours.filter(h => h > 0);
+    if (nonZero.length) return nonZero.reduce((sum, h) => sum + h, 0) / nonZero.length;
+
+    let totalH = 0;
+    getMachineBaseShiftNumbers(machine, allShifts).forEach(sn => {
+        const shift = allShifts.find(s => s.shift_number === sn);
+        if (shift) totalH += shiftDuration(shift);
+    });
+    if (!totalH) totalH = (machine.num_shifts || 1) * (machine.shift_hours || 8);
     return totalH * ((machine.capacity_percent || 100) / 100);
 }
 
@@ -263,8 +313,103 @@ export function scheduleParts(parts, machines, deps) {
         });
     }
 
+    const workDates = [];
+    const getWorkDate = index => {
+        let cursor = workDates.length
+            ? new Date(workDates[workDates.length - 1].getTime())
+            : new Date(appSettings.start_date + 'T00:00:00');
+        if (!workDates.length && isWorkingDay(cursor, appSettings)) {
+            workDates.push(new Date(cursor.getTime()));
+        }
+        while (workDates.length <= index) {
+            cursor = new Date(workDates.length ? workDates[workDates.length - 1].getTime() : cursor.getTime());
+            cursor.setDate(cursor.getDate() + 1);
+            while (!isWorkingDay(cursor, appSettings)) cursor.setDate(cursor.getDate() + 1);
+            workDates.push(new Date(cursor.getTime()));
+        }
+        return workDates[index];
+    };
+    const getDayCapacity = (machine, dayIndex) => {
+        const date = getWorkDate(dayIndex);
+        return getMachineHoursForDow(machine, date.getDay(), allShifts);
+    };
+    const normalizeCursor = (machine, cursor) => {
+        let cur = { dayIndex: Math.max(0, cursor.dayIndex || 0), usedHours: Math.max(0, cursor.usedHours || 0) };
+        let safety = 0;
+        while (safety < 5000) {
+            const cap = getDayCapacity(machine, cur.dayIndex);
+            if (cap > 0 && cur.usedHours < cap) return cur;
+            cur = { dayIndex: cur.dayIndex + 1, usedHours: 0 };
+            safety++;
+        }
+        return null;
+    };
+    const cursorSortKey = (machine, cursor) => {
+        const norm = normalizeCursor(machine, cursor);
+        if (!norm) return Number.POSITIVE_INFINITY;
+        const cap = getDayCapacity(machine, norm.dayIndex);
+        return norm.dayIndex + (cap > 0 ? norm.usedHours / cap : 0);
+    };
+    const maxCursor = (machine, a, b) => (cursorSortKey(machine, a) >= cursorSortKey(machine, b) ? a : b);
+    const advanceTask = (machine, taskHours, requestedCursor) => {
+        let startCursor = normalizeCursor(machine, requestedCursor);
+        if (!startCursor) return null;
+        const startCap = getDayCapacity(machine, startCursor.dayIndex);
+        const startRem = startCap - startCursor.usedHours;
+        if (taskHours > startRem && startRem > 1e-9) {
+            startCursor = normalizeCursor(machine, { dayIndex: startCursor.dayIndex + 1, usedHours: 0 });
+            if (!startCursor) return null;
+        }
+
+        const startDayCap = getDayCapacity(machine, startCursor.dayIndex);
+        const startDay = startCursor.dayIndex + (startDayCap > 0 ? startCursor.usedHours / startDayCap : 0);
+        let cur = { ...startCursor };
+        let remainingHrs = taskHours;
+        let safety = 0;
+
+        while (remainingHrs > 1e-9 && safety < 10000) {
+            const cap = getDayCapacity(machine, cur.dayIndex);
+            if (cap <= 0) {
+                cur = { dayIndex: cur.dayIndex + 1, usedHours: 0 };
+                safety++;
+                continue;
+            }
+            const free = Math.max(0, cap - cur.usedHours);
+            if (free <= 1e-9) {
+                cur = { dayIndex: cur.dayIndex + 1, usedHours: 0 };
+                safety++;
+                continue;
+            }
+            const used = Math.min(remainingHrs, free);
+            remainingHrs -= used;
+            cur.usedHours += used;
+            if (remainingHrs > 1e-9) {
+                cur = { dayIndex: cur.dayIndex + 1, usedHours: 0 };
+            }
+            safety++;
+        }
+        if (remainingHrs > 1e-9) return null;
+
+        const endCap = getDayCapacity(machine, cur.dayIndex);
+        const endsAtBoundary = endCap > 0 && cur.usedHours >= endCap - 1e-9;
+        const endDay = endsAtBoundary
+            ? cur.dayIndex + 1
+            : cur.dayIndex + (endCap > 0 ? cur.usedHours / endCap : 0);
+        const nextCursor = endsAtBoundary
+            ? { dayIndex: cur.dayIndex + 1, usedHours: 0 }
+            : { ...cur };
+
+        return {
+            dailyHours: startDayCap,
+            startDay,
+            endDay,
+            barDays: endDay - startDay,
+            nextCursor,
+        };
+    };
+
     const avail = {};
-    active.forEach(m => { avail[m.id] = 0; });
+    active.forEach(m => { avail[m.id] = { dayIndex: 0, usedHours: 0 }; });
 
     const scheduled = [];
     let seq = 1;
@@ -283,11 +428,9 @@ export function scheduleParts(parts, machines, deps) {
         }
 
         const chosen = candidatePool.reduce(
-            (best, m) => avail[m.id] < avail[best.id] ? m : best,
+            (best, m) => cursorSortKey(m, avail[m.id]) < cursorSortKey(best, avail[best.id]) ? m : best,
             candidatePool[0]
         );
-        const daily = mDailyForMachine(chosen, allShifts);
-        const barDays = (daily > 0) ? task.opHrs / daily : 1;
 
         let pinnedDay = null;
         if (task.pinnedDate) {
@@ -295,28 +438,22 @@ export function scheduleParts(parts, machines, deps) {
             if (pinnedDay < 0) pinnedDay = 0;
         }
 
-        let startDay = (pinnedDay !== null)
-            ? Math.max(pinnedDay, avail[chosen.id])
+        const requestedCursor = (pinnedDay !== null)
+            ? maxCursor(chosen, avail[chosen.id], { dayIndex: pinnedDay, usedHours: 0 })
             : avail[chosen.id];
-
-        const dayEnd = Math.ceil(startDay);
-        const remHrs = (dayEnd - startDay) * daily;
-        if (task.opHrs > remHrs && remHrs >= 0) {
-            startDay = dayEnd;
-        }
-
-        const endDay = startDay + barDays;
-        avail[chosen.id] = Math.max(avail[chosen.id], endDay);
+        const placement = advanceTask(chosen, task.opHrs, requestedCursor);
+        if (!placement) return;
+        avail[chosen.id] = placement.nextCursor;
 
         scheduled.push({
             ...task,
             machineId: chosen.id,
             machineName: chosen.name,
             machineType: chosen.machine_type,
-            dailyHours: daily,
-            barDays,
-            startDay,
-            endDay,
+            dailyHours: placement.dailyHours,
+            barDays: placement.barDays,
+            startDay: placement.startDay,
+            endDay: placement.endDay,
             seqNum: seq++,
         });
     });

@@ -15,6 +15,7 @@ import {
     wdBetween as scheduleWdBetween,
     fmtDate as scheduleFmtDate,
     localDateStr as scheduleLocalDateStr,
+    getMachineActiveShiftNumbersForDow as scheduleGetMachineActiveShiftNumbersForDow,
     mDailyForMachine as scheduleMDailyForMachine,
     autoVehicleForUnit as scheduleAutoVehicleForUnit,
     expandPart as scheduleExpandPart,
@@ -225,7 +226,11 @@ function localDateStr(d) { return scheduleLocalDateStr(d); }
 /* ═══════════════════════════════════════════════════════════════
    5 · MACHINE CAPACITY
 ═══════════════════════════════════════════════════════════════ */
-function mDailyForMachine(machine) { return scheduleMDailyForMachine(machine, allShifts); }
+function mDailyForMachine(machine) { return scheduleMDailyForMachine(machine, allShifts, appSettings); }
+
+function getMachineActiveShiftNumbersForDow(machine, dow) {
+    return scheduleGetMachineActiveShiftNumbersForDow(machine, dow, allShifts);
+}
 
 /* ═══════════════════════════════════════════════════════════════
    6 · VEHICLE AUTO-ASSIGNMENT
@@ -651,13 +656,73 @@ function openMachModal(m) {
     $('m-type').value = m ? m.machine_type || '' : '';
     $('m-capacity').value = m ? m.capacity_percent || 100 : 100;
     // Render active shifts checkboxes
-    renderMachineShiftChecks(m?.active_shifts || null, m?.num_shifts || 1);
+    renderMachineShiftChecks(m?.active_shifts || null, m?.num_shifts || 1, m?.shift_day_overrides || null);
     updateMachModalDaily(m);
     $('machine-modal').classList.remove('hidden');
     $('m-name').focus();
 }
 
-function renderMachineShiftChecks(activeShifts, numShiftsLegacy) {
+function collectMachineShiftDayOverridesFromUi() {
+    const wrap = $('m-shift-day-overrides'); if (!wrap) return {};
+    const out = {};
+    wrap.querySelectorAll('[data-dow]').forEach(row => {
+        const dow = row.dataset.dow;
+        const vals = Array.from(row.querySelectorAll('input[name="mshift-day"]:checked'))
+            .map(cb => parseInt(cb.value, 10))
+            .filter(v => Number.isInteger(v));
+        out[dow] = vals;
+    });
+    return out;
+}
+
+function renderMachineShiftDayOverrides(dayOverrides) {
+    const wrap = $('m-shift-day-overrides'); if (!wrap) return;
+    const selected = Array.from(document.querySelectorAll('#m-active-shifts input[name="mshift"]:checked'))
+        .map(cb => parseInt(cb.value, 10))
+        .filter(v => Number.isInteger(v));
+    if (!selected.length) {
+        wrap.innerHTML = '<span class="mf-hint">Select active shifts above, then uncheck any days where a shift should not run.</span>';
+        return;
+    }
+
+    const overrides = dayOverrides && typeof dayOverrides === 'object' ? dayOverrides : {};
+    const days = [
+        { dow: 0, label: 'Sun' },
+        { dow: 1, label: 'Mon' },
+        { dow: 2, label: 'Tue' },
+        { dow: 3, label: 'Wed' },
+        { dow: 4, label: 'Thu' },
+        { dow: 6, label: 'Sat' },
+    ];
+
+    wrap.innerHTML = days.map(({ dow, label }) => {
+        const defaultShifts = selected.filter(sn => getMachineActiveShiftNumbersForDow({ active_shifts: selected }, dow).includes(sn));
+        if (!defaultShifts.length) {
+            return `<div class="machine-day-row" data-dow="${dow}">
+      <span class="machine-day-label">${label}</span>
+      <span class="mf-hint">No selected shifts available on this day</span>
+    </div>`;
+        }
+        const saved = Array.isArray(overrides[String(dow)]) ? overrides[String(dow)] : defaultShifts;
+        return `<div class="machine-day-row" data-dow="${dow}">
+      <span class="machine-day-label">${label}</span>
+      <div class="machine-day-checks">
+        ${defaultShifts.map(sn => {
+                const shift = allShifts.find(s => s.shift_number === sn);
+                const checked = saved.includes(sn);
+                return `<label class="day-shift-chip">
+            <input type="checkbox" name="mshift-day" value="${sn}" ${checked ? 'checked' : ''}/>
+            <span>S${sn}${shift ? ' · ' + esc(shift.shift_name) : ''}</span>
+          </label>`;
+            }).join('')}
+      </div>
+    </div>`;
+    }).join('');
+
+    wrap.querySelectorAll('input[name="mshift-day"]').forEach(cb => cb.addEventListener('change', () => updateMachModalDaily(null)));
+}
+
+function renderMachineShiftChecks(activeShifts, numShiftsLegacy, shiftDayOverrides = null) {
     const wrap = $('m-active-shifts'); if (!wrap) return;
     if (!allShifts.length) { wrap.innerHTML = '<span class="mf-hint">No shifts configured yet.</span>'; return; }
     // Determine which shifts are active
@@ -679,23 +744,27 @@ function renderMachineShiftChecks(activeShifts, numShiftsLegacy) {
       <span class="sc-hrs">${hrs}h</span>
     </label>`;
     }).join('');
-    wrap.querySelectorAll('input[name="mshift"]').forEach(cb => cb.addEventListener('change', () => updateMachModalDaily(null)));
+    wrap.querySelectorAll('input[name="mshift"]').forEach(cb => cb.addEventListener('change', () => {
+        renderMachineShiftDayOverrides(collectMachineShiftDayOverridesFromUi());
+        updateMachModalDaily(null);
+    }));
+    renderMachineShiftDayOverrides(shiftDayOverrides);
 }
 
 function updateMachModalDaily(m) {
-    const cap = (parseFloat($('m-capacity')?.value) || 100) / 100;
+    const capPct = parseFloat($('m-capacity')?.value) || (m?.capacity_percent || 100);
     const selected = Array.from(document.querySelectorAll('#m-active-shifts input[name="mshift"]:checked'))
-        .map(cb => parseInt(cb.value, 10));
-    let hrs = 0;
-    if (selected.length) {
-        selected.forEach(sn => { const s = allShifts.find(x => x.shift_number === sn); if (s) hrs += shiftDuration(s); });
-    } else if (m) {
-        hrs = (m.num_shifts || 1) * (m.shift_hours || 8);
-    } else {
-        hrs = 8;
-    }
+        .map(cb => parseInt(cb.value, 10))
+        .filter(v => Number.isInteger(v));
+    const machinePreview = {
+        ...(m || {}),
+        active_shifts: selected.length ? selected : null,
+        shift_day_overrides: collectMachineShiftDayOverridesFromUi(),
+        capacity_percent: capPct,
+    };
+    const hrs = mDailyForMachine(machinePreview) || 0;
     const el = $('modal-daily-hrs');
-    if (el) el.textContent = (hrs * cap).toFixed(2) + ' hrs/day';
+    if (el) el.textContent = hrs.toFixed(2) + ' hrs/day';
 }
 
 async function saveMachFromModal() {
@@ -706,6 +775,7 @@ async function saveMachFromModal() {
     const id = rawId ? parseInt(rawId, 10) : null;
     const activeShifts = Array.from(document.querySelectorAll('#m-active-shifts input[name="mshift"]:checked'))
         .map(cb => parseInt(cb.value, 10));
+    const shiftDayOverrides = collectMachineShiftDayOverridesFromUi();
 
     if (!name) { showToast('Machine Name required', 'error'); return; }
     if (!type) { showToast('Machine Type required', 'error'); return; }
@@ -718,6 +788,7 @@ async function saveMachFromModal() {
         await saveMachine({
             id, name, machine_type: type, capacity_percent: cap, is_active: true,
             active_shifts: activeShifts.length ? activeShifts : null,
+            shift_day_overrides: shiftDayOverrides,
             num_shifts: activeShifts.length || 1, shift_hours: 8
         });
         closeMachModal();

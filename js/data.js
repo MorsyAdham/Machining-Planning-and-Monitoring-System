@@ -60,7 +60,13 @@ export async function loadMachinesData(db, activeBuildingId) {
     try {
         const { data, error } = await db.from('building1_machines').select('*').eq('building_id', activeBuildingId).order('sort_order').order('name');
         if (error) throw error;
-        return data || [];
+        return (data || []).map(m => ({
+            ...m,
+            active_shifts: Array.isArray(m.active_shifts) ? m.active_shifts : (m.active_shifts ? JSON.parse(m.active_shifts) : null),
+            shift_day_overrides: (m.shift_day_overrides && typeof m.shift_day_overrides === 'string')
+                ? JSON.parse(m.shift_day_overrides)
+                : (m.shift_day_overrides || {}),
+        }));
     } catch {
         return [];
     }
