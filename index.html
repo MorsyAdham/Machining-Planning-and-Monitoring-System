@@ -720,45 +720,6 @@
                 <span id="status-text-inline">Connecting…</span>
             </div>
         </section>
-        <section class="panel panel-collapsible" id="panel-machines">
-            <div class="panel-hdr">
-                <div class="panel-hdr-left">
-                    <button class="panel-collapse-btn" aria-label="Collapse panel" title="Collapse/Expand">
-                        <svg class="collapse-icon" width="12" height="12" viewBox="0 0 24 24" fill="none"
-                            stroke="currentColor" stroke-width="2.5">
-                            <polyline points="6 9 12 15 18 9" />
-                        </svg>
-                    </button>
-                    <span class="panel-icon">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <circle cx="12" cy="12" r="3" />
-                            <path
-                                d="M19.07 4.93l-1.41 1.41M4.93 4.93l1.41 1.41M20 12h-2M6 12H4M19.07 19.07l-1.41-1.41M4.93 19.07l1.41-1.41M12 20v-2M12 6V4" />
-                        </svg>
-                    </span>
-                    <h2>Machine Management</h2>
-                    <span class="panel-count" id="machines-count"></span>
-                </div>
-                <button class="btn btn-amber btn-sm" id="add-machine-btn">+ Add Machine</button>
-            </div>
-            <div id="machines-table-wrap" class="panel-body-flush">
-                <div class="empty-state">
-                    <div class="es-icon">
-                        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                            stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                            <circle cx="12" cy="12" r="3" />
-                            <path
-                                d="M19.07 4.93l-1.41 1.41M4.93 4.93l1.41 1.41M20 12h-2M6 12H4M19.07 19.07l-1.41-1.41M4.93 19.07l1.41-1.41M12 20v-2M12 6V4" />
-                        </svg>
-                    </div>
-                    <p class="es-title">No machines configured</p>
-                    <p>Add machines to start scheduling production tasks.</p>
-                    <button class="btn btn-outline btn-sm" id="es-add-machine-btn">+ Add Machine</button>
-                </div>
-            </div>
-        </section>
-
         <section class="panel" id="panel-overview">
             <div class="panel-hdr">
                 <div class="panel-hdr-left"><span class="panel-icon">
@@ -851,6 +812,45 @@
                 </div>
                 <div class="vbd-wrap" id="vehicle-breakdown">
                     <div class="vbd-empty">Upload data to see vehicle breakdown</div>
+                </div>
+            </div>
+        </section>
+
+        <section class="panel panel-collapsible" id="panel-machines">
+            <div class="panel-hdr">
+                <div class="panel-hdr-left">
+                    <button class="panel-collapse-btn" aria-label="Collapse panel" title="Collapse/Expand">
+                        <svg class="collapse-icon" width="12" height="12" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" stroke-width="2.5">
+                            <polyline points="6 9 12 15 18 9" />
+                        </svg>
+                    </button>
+                    <span class="panel-icon">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="3" />
+                            <path
+                                d="M19.07 4.93l-1.41 1.41M4.93 4.93l1.41 1.41M20 12h-2M6 12H4M19.07 19.07l-1.41-1.41M4.93 19.07l1.41-1.41M12 20v-2M12 6V4" />
+                        </svg>
+                    </span>
+                    <h2>Machine Management</h2>
+                    <span class="panel-count" id="machines-count"></span>
+                </div>
+                <button class="btn btn-amber btn-sm" id="add-machine-btn">+ Add Machine</button>
+            </div>
+            <div id="machines-table-wrap" class="panel-body-flush">
+                <div class="empty-state">
+                    <div class="es-icon">
+                        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="3" />
+                            <path
+                                d="M19.07 4.93l-1.41 1.41M4.93 4.93l1.41 1.41M20 12h-2M6 12H4M19.07 19.07l-1.41-1.41M4.93 19.07l1.41-1.41M12 20v-2M12 6V4" />
+                        </svg>
+                    </div>
+                    <p class="es-title">No machines configured</p>
+                    <p>Add machines to start scheduling production tasks.</p>
+                    <button class="btn btn-outline btn-sm" id="es-add-machine-btn">+ Add Machine</button>
                 </div>
             </div>
         </section>

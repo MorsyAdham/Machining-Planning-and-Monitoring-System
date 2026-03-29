@@ -58,7 +58,9 @@ import {
     insertPartData,
     updatePartData,
     deletePartData,
-    countPartsData
+    updatePartSortOrders,
+    countPartsData,
+    canConnectToBuilding
 } from './data.js';
 import {
     showToastUi,
@@ -98,12 +100,19 @@ const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', '
 const DOWS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
 const DAYNAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
+function defaultSettingsForBuilding(buildingId) {
+    return {
+        ...DEFAULT_SETTINGS,
+        time_unit: buildingId === 2 ? 'min' : 'h',
+    };
+}
+
 /* ═══════════════════════════════════════════════════════════════
    2 · STATE
 ═══════════════════════════════════════════════════════════════ */
 let db = null;
 let activeBuildingId = 1;   // 1 = Building #1, 2 = Building #2
-let appSettings = { ...DEFAULT_SETTINGS };
+let appSettings = defaultSettingsForBuilding(1);
 let allShifts = [...FALLBACK_SHIFTS];
 let currentMachines = [];
 let currentParts = [];
@@ -426,7 +435,7 @@ async function loadProdSequence() {
    9 · SETTINGS
 ═══════════════════════════════════════════════════════════════ */
 async function loadSettings() {
-    appSettings = await loadSettingsData(db, activeBuildingId, DEFAULT_SETTINGS);
+    appSettings = await loadSettingsData(db, activeBuildingId, defaultSettingsForBuilding(activeBuildingId));
     appSettings.system_layout = normalizeSystemLayout(appSettings.system_layout || loadStoredSystemLayout(activeBuildingId));
     populateSettingsForm();
 }
@@ -445,7 +454,7 @@ async function saveSettings(fd) {
         updated_at: new Date().toISOString(),
     };
     try {
-        const { error } = await saveSettingsData(db, s);
+        const { error } = await saveSettingsData(db, activeBuildingId, s);
         if (error) throw error;
         appSettings = { ...s };
         showToast('Settings saved ✓', 'success');
@@ -548,7 +557,7 @@ async function saveShiftFromModal() {
     };
     showLoading('Saving shift…');
     try {
-        const { error } = await upsertShiftData(db, id, rec);
+        const { error } = await upsertShiftData(db, activeBuildingId, id, rec);
         if (error) throw error;
         closeShiftModal();
         await loadShifts();
@@ -563,7 +572,7 @@ async function deleteShiftFromModal() {
     if (!confirm('Delete this shift? Machines using it will fall back to defaults.')) return;
     showLoading('Deleting…');
     try {
-        const { error } = await deleteShiftData(db, parseInt(rawId, 10));
+        const { error } = await deleteShiftData(db, activeBuildingId, parseInt(rawId, 10));
         if (error) throw error;
         closeShiftModal();
         await loadShifts();
@@ -589,12 +598,12 @@ async function saveMachine(m) {
 }
 
 async function deleteMachine(id) {
-    const { error } = await deleteMachineData(db, id);
+    const { error } = await deleteMachineData(db, activeBuildingId, id);
     if (error) throw error;
 }
 
 async function toggleMachine(m) {
-    const { error } = await toggleMachineData(db, m);
+    const { error } = await toggleMachineData(db, activeBuildingId, m);
     if (error) throw error;
 }
 
@@ -821,8 +830,9 @@ async function uploadFile(file) {
         const nonEmpty = aoa.filter(r => r.some(c => c !== null && c !== '' && c !== undefined));
         if (nonEmpty.length < 2) throw new Error('Sheet 1 has no data rows.');
 
-        const hdr = nonEmpty[0].map(h => String(h ?? '').toLowerCase().trim().replace(/[\s\-.]+/g, '_').replace(/[^a-z0-9_]/g, ''));
-        const rawRows = nonEmpty.slice(1).map(row => {
+        const headerRowIndex = findUploadHeaderRowIndex(nonEmpty);
+        const hdr = nonEmpty[headerRowIndex].map(normalizeUploadHeader);
+        const rawRows = nonEmpty.slice(headerRowIndex + 1).map(row => {
             const obj = {}; hdr.forEach((k, i) => { obj[k] = row[i] ?? ''; }); return obj;
         });
 
@@ -842,6 +852,31 @@ async function uploadFile(file) {
     } finally { hideLoading(); }
 }
 
+function normalizeUploadHeader(value) {
+    return String(value ?? '')
+        .toLowerCase()
+        .trim()
+        .replace(/[\s./()-]+/g, '_')
+        .replace(/[^a-z0-9_]/g, '')
+        .replace(/_+/g, '_')
+        .replace(/^_|_$/g, '');
+}
+
+function findUploadHeaderRowIndex(rows) {
+    const headerMatchers = [
+        ['part_number', 'remaining_qty'],
+        ['part_number', 'rem_qty'],
+        ['part_number', 'rem'],
+    ];
+
+    for (let i = 0; i < rows.length; i++) {
+        const normalized = rows[i].map(normalizeUploadHeader);
+        const hasMatch = headerMatchers.some(req => req.every(key => normalized.includes(key)));
+        if (hasMatch) return i;
+    }
+    return 0;
+}
+
 function normalizeRow(raw) {
     function get(...keys) {
         for (const k of keys) {
@@ -850,21 +885,21 @@ function normalizeRow(raw) {
         }
         return '';
     }
-    const remRaw = get('remaining_qty', 'remaining qty', 'remainingqty', 'remaining', 'qty_remaining', 'left', 'balance');
-    const startedRaw = get('started_qty', 'started qty', 'startedqty', 'qty_started', 'started');
+    const remRaw = get('remaining_qty', 'remaining qty', 'remainingqty', 'remaining', 'qty_remaining', 'left', 'balance', 'rem_qty', 'rem', 'rem_qry');
+    const startedRaw = get('started_qty', 'started qty', 'startedqty', 'qty_started', 'started', 'started_qry');
     return {
         part_number: get('part_number', 'part number', 'partnumber', 'part_no', 'partno', 'p_n', 'pn'),
         part_name: get('part_name', 'part name', 'partname', 'description', 'name', 'desc'),
         setup_hrs: flt(get('setup_hrs', 'setup hrs', 'set_up_hrs')),
         mach_hrs: flt(get('mach_hrs', 'mach hrs', 'machine_hrs')),
-        op_hrs: flt(get('op_hrs', 'op hrs', 'op_hours', 'operation_hrs', 'total_hrs')),
-        k9: get('k9', 'k 9') || null,
-        k10: get('k10', 'k 10') || null,
-        k11: get('k11', 'k 11') || null,
-        battalion_qty: flt(get('battalion_qty', 'battalion qty', 'battalion')),
+        op_hrs: flt(get('op_hrs', 'op hrs', 'op_hours', 'operation_hrs', 'total_hrs', 'op_hrs_unit', 'op_hrs_per_unit', 'op_min_unit')),
+        k9: get('k9', 'k_9') || null,
+        k10: get('k10', 'k_10') || null,
+        k11: get('k11', 'k_11') || null,
+        battalion_qty: flt(get('battalion_qty', 'battalion qty', 'battalion', 'batt_qty')),
         remaining_qty: parseFloat(remRaw || 0) || 0,
         started_qty: parseFloat(startedRaw || 0) || 0,
-        location: get('location', 'machine_type', 'machine type', 'machine', 'loc'),
+        location: get('location', 'machine_type', 'machine type', 'machine', 'loc', 'location_machine'),
         building_id: activeBuildingId,
         status: 'not_started', shift_preference: null, k9_qty: null, k10_qty: null, k11_qty: null,
         unit_overrides: null, target_date: null,
@@ -1036,9 +1071,9 @@ async function onReorder(e) {
     currentParts = allParts.filter(p => flt(p.remaining_qty) > 0);
     renderPartsTable();
     try {
-        await Promise.all([
-            db.from('building1_parts').update({ sort_order: soB }).eq('id', a.id),
-            db.from('building1_parts').update({ sort_order: soA }).eq('id', b.id),
+        await updatePartSortOrders(db, activeBuildingId, [
+            { id: a.id, sort_order: soB },
+            { id: b.id, sort_order: soA },
         ]);
         rebuildPlan();
     } catch (err) { showToast('Reorder failed: ' + err.message, 'error'); }
@@ -1200,7 +1235,7 @@ async function savePartFromModal() {
     try {
         if (isAdd) {
             const nextOrder = (allParts.length ? Math.max(...allParts.map(p => p.sort_order || 0)) : 0) + 1;
-            const { error } = await insertPartData(db, {
+            const { error } = await insertPartData(db, activeBuildingId, {
                 part_number: partNumber, part_name: partName,
                 k9: k9Flag, k10: k10Flag, k11: k11Flag, battalion_qty: batQty || 0,
                 location, status, remaining_qty: remaining, started_qty: started, op_hrs: opHrs,
@@ -1212,7 +1247,7 @@ async function savePartFromModal() {
             if (error) throw error;
             showToast('Part added ✓', 'success');
         } else {
-            const { error } = await updatePartData(db, parseInt(id, 10), {
+            const { error } = await updatePartData(db, activeBuildingId, parseInt(id, 10), {
                 location, status, remaining_qty: remaining, started_qty: started, op_hrs: opHrs,
                 preferred_machine_id: preferredMachineId,
                 shift_preference: shift, k9_qty: k9q, k10_qty: k10q, k11_qty: k11q,
@@ -1234,7 +1269,7 @@ async function deleteCurrentPart() {
     if (!confirm(`Delete "${name}"? This cannot be undone.`)) return;
     showLoading('Deleting…');
     try {
-        const { error } = await deletePartData(db, parseInt(id, 10));
+        const { error } = await deletePartData(db, activeBuildingId, parseInt(id, 10));
         if (error) throw error;
         closePartModal();
         await loadAllPartsAndRebuild();
@@ -1448,6 +1483,14 @@ function fmtOp(v) {
     if ((appSettings.time_unit || 'h') === 'min') return `${flt(v).toFixed(0)} min`;
     return `${flt(v).toFixed(2)} h`;
 }
+function formatGanttDuration(hours, decimals = 1) {
+    if (unitLabel() === 'min') return `${flt(hours * 60).toFixed(0)} min`;
+    return `${flt(hours).toFixed(decimals)} h`;
+}
+function formatGanttDurationCompact(hours) {
+    if (unitLabel() === 'min') return `${flt(hours * 60).toFixed(0)}m`;
+    return `${flt(hours).toFixed(0)}h`;
+}
 
 // Build rich tooltip HTML for a task
 // Optional opts: { unitTotal (total units of this part on this machine), seqNum, taskIdx/totalTasks }
@@ -1598,7 +1641,7 @@ function renderMachineView(tasks, c) {
         <span class="gl-main">
           <span class="gl-group-name">⚙ ${esc(type)}</span>
         </span>
-        <span class="gl-badge">${typeTasks.length} tasks · ${typeHrs.toFixed(0)} h</span>
+        <span class="gl-badge">${typeTasks.length} tasks · ${formatGanttDuration(typeHrs, 0)}</span>
       </div>
       <div class="gr-timeline" style="width:${totW}px;">${tl}</div>
     </div>`;
@@ -1638,7 +1681,7 @@ function renderMachineView(tasks, c) {
         <div class="gr-label" style="width:${LW}px;min-width:${LW}px;">
           <span class="gl-main">
             <span class="gl-name">${esc(mName)}</span>
-            <span class="gl-sub">${mTasks.length} tasks · ${totalHrs.toFixed(1)} h</span>
+            <span class="gl-sub">${mTasks.length} tasks · ${formatGanttDuration(totalHrs, 1)}</span>
           </span>
           <div class="util-pill" style="--uc:${utilColor}">
             <div class="util-bar" style="width:${util}%;background:${utilColor};"></div>
@@ -1726,6 +1769,7 @@ function renderPartView(tasks, c) {
         const ed = addWD(appSettings.start_date, spanEndCeil > Math.floor(spanStart) ? spanEndCeil - 1 : spanEndCeil, appSettings);
         const machStr = Array.from(machs).join(', ');
         const vehStr = vCounts.map(v => `${v}×${vehicles[v]}`).join(' · ');
+        const totalLabel = unitLabel() === 'min' ? 'Total Min' : 'Total Hrs';
         const tipHTML = `<div class="gt-head">
       <span class="gt-pn">${esc(pn)}</span>
       ${vCounts.map(v => `<span class="gt-veh-pill ${VMETA[v]?.cls || 'k9'}">${v} ×${vehicles[v]}</span>`).join('')}
@@ -1736,7 +1780,7 @@ function renderPartView(tasks, c) {
         <div class="gt-row"><span class="gt-row-label">Machine</span><span class="gt-row-value">${esc(machStr)}</span></div>
         <div class="gt-row"><span class="gt-row-label">Start</span><span class="gt-row-value">${fmtDate(sd)}</span></div>
         <div class="gt-row"><span class="gt-row-label">End</span><span class="gt-row-value">${fmtDate(ed)}</span></div>
-        <div class="gt-row"><span class="gt-row-label">Total Hrs</span><span class="gt-row-value">${totalHrs.toFixed(1)} h across ${pTasks.length} units</span></div>
+        <div class="gt-row"><span class="gt-row-label">${totalLabel}</span><span class="gt-row-value">${formatGanttDuration(totalHrs, 1)} across ${pTasks.length} units</span></div>
       </div>
     </div>`;
 
@@ -1846,10 +1890,10 @@ function renderWeeklyView(tasks, c) {
             const tipHTML = `<div class="gt-head"><span class="gt-pn">${esc(pn)}</span><span style="color:var(--tx3);font-family:var(--ff-m);font-size:.6rem">Week of ${weeks[wi].days[0].getDate()} ${MONTHS[weeks[wi].days[0].getMonth()]}</span></div>
         <div class="gt-body"><div class="gt-name">${esc(partName)}</div>
         <div class="gt-rows">
-          ${bk.hrs.K9 > 0 ? `<div class="gt-row"><span class="gt-row-label" style="color:var(--k9c)">K9</span><span class="gt-row-value">${bk.hrs.K9.toFixed(1)} h</span></div>` : ''}
-          ${bk.hrs.K10 > 0 ? `<div class="gt-row"><span class="gt-row-label" style="color:var(--k10c)">K10</span><span class="gt-row-value">${bk.hrs.K10.toFixed(1)} h</span></div>` : ''}
-          ${bk.hrs.K11 > 0 ? `<div class="gt-row"><span class="gt-row-label" style="color:var(--k11c)">K11</span><span class="gt-row-value">${bk.hrs.K11.toFixed(1)} h</span></div>` : ''}
-          <div class="gt-row"><span class="gt-row-label">Total</span><span class="gt-row-value">${totalH.toFixed(1)} h · ${bk.count} units</span></div>
+          ${bk.hrs.K9 > 0 ? `<div class="gt-row"><span class="gt-row-label" style="color:var(--k9c)">K9</span><span class="gt-row-value">${formatGanttDuration(bk.hrs.K9, 1)}</span></div>` : ''}
+          ${bk.hrs.K10 > 0 ? `<div class="gt-row"><span class="gt-row-label" style="color:var(--k10c)">K10</span><span class="gt-row-value">${formatGanttDuration(bk.hrs.K10, 1)}</span></div>` : ''}
+          ${bk.hrs.K11 > 0 ? `<div class="gt-row"><span class="gt-row-label" style="color:var(--k11c)">K11</span><span class="gt-row-value">${formatGanttDuration(bk.hrs.K11, 1)}</span></div>` : ''}
+          <div class="gt-row"><span class="gt-row-label">Total</span><span class="gt-row-value">${formatGanttDuration(totalH, 1)} · ${bk.count} units</span></div>
         </div></div>`;
             return `<div class="wk-cell-wrap" style="left:${wi * WW + 3}px;width:${WW - 6}px;" data-tip="${escAttr(tipHTML)}">
         <div class="wk-veh-bar">
@@ -1857,7 +1901,7 @@ function renderWeeklyView(tasks, c) {
           ${k10pct > 0 ? `<div class="wk-seg wk-k10" style="width:${k10pct.toFixed(1)}%"></div>` : ''}
           ${k11pct > 0 ? `<div class="wk-seg wk-k11" style="width:${k11pct.toFixed(1)}%"></div>` : ''}
         </div>
-        <span class="wk-hrs">${totalH.toFixed(0)}h</span>
+        <span class="wk-hrs">${formatGanttDurationCompact(totalH)}</span>
       </div>`;
         }).join('');
 
@@ -2425,7 +2469,7 @@ async function switchBuilding(id) {
     // Reset all state
     allParts = []; currentParts = []; scheduledTasks = [];
     allShifts = [...FALLBACK_SHIFTS]; currentMachines = [];
-    appSettings = { ...DEFAULT_SETTINGS };
+    appSettings = defaultSettingsForBuilding(id);
     ptSearch = ''; ptLoc = ''; ptStatus = ''; ptVeh = '';
     gSearch = ''; gMach = ''; gVeh = '';
     prodSequence = [];
@@ -2454,7 +2498,7 @@ async function init() {
     showLoading('Connecting to database…');
     try {
         db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-        const { error } = await db.from('building1_settings').select('id').limit(1);
+        const { error } = await canConnectToBuilding(db, activeBuildingId);
         if (error) throw error;
         setConn(true);
     } catch (err) {
